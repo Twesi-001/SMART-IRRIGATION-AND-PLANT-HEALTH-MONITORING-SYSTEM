@@ -1,0 +1,24 @@
+# ============================================================
+# Smart Irrigation and Plant Health Monitoring System
+# Combined Python dependencies — all layers
+# Install with: pip install -r requirements.txt
+# ============================================================
+
+# --- Flask REST API / Database layer (Section 3.7) ---
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-JWT-Extended==4.6.0
+Flask-Cors==4.0.1
+PyMySQL==1.1.1
+cryptography==42.0.8
+python-dotenv==1.0.1
+
+# --- IoT / data transmission layer (Section 3.5) ---
+pyserial==3.5
+
+# --- Machine learning layer (Section 3.6) ---
+# pandas==2.2.2
+# numpy==1.26.4
+# scikit-learn==1.5.0
+# matplotlib==3.9.0
+# jupyter==1.0.0
