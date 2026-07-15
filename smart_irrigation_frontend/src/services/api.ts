@@ -8,11 +8,11 @@ import {
   Alert
 } from '../types';
 
-// ✅ HARDCODED - forces use of proxy
-const API_URL = '/api';
+// ✅ Use environment variable for API URL
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_KEY = import.meta.env.VITE_API_KEY || 'A0Wt_9n-2o7uL1MNuzsrUTCD2BioR_Fq3ZF1BnVK7gw';
 
-console.log('API_URL:', API_URL); // Should show "/api"
+console.log('API_URL:', API_URL); // Should show the Render URL in production
 
 const api = axios.create({
   baseURL: API_URL,
