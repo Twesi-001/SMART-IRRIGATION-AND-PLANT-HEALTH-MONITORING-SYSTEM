@@ -13,8 +13,12 @@ def create_app(config_class=Config):
     db.init_app(app)
     jwt.init_app(app)
     
-    # ✅ Fix: Configure CORS properly
-    CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
+    # ✅ Updated CORS configuration with production frontend URL
+    CORS(app, supports_credentials=True, origins=[
+        "http://localhost:3000",  # Local development
+        "http://127.0.0.1:3000",  # Local development alternative
+        "https://smart-irrigation-and-plant-health-m.vercel.app"  # ← YOUR DEPLOYED FRONTEND URL
+    ])
 
     from app.auth import auth_bp
     from app.readings import readings_bp
