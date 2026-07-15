@@ -13,12 +13,14 @@ def create_app(config_class=Config):
     db.init_app(app)
     jwt.init_app(app)
     
-    # ✅ Updated CORS configuration with production frontend URL
-    CORS(app, supports_credentials=True, origins=[
-        "http://localhost:3000",  # Local development
-        "http://127.0.0.1:3000",  # Local development alternative
-        "https://smart-irrigation-and-plant-health-m.vercel.app"  # ← YOUR DEPLOYED FRONTEND URL
-    ])
+    # ✅ CORS configuration - Allow all origins for API routes
+    # This allows any frontend (including Vercel preview deployments) to access the API
+    CORS(app, 
+         resources={r"/api/*": {"origins": "*"}},
+         supports_credentials=True,
+         allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+         methods=["GET", "PUT", "POST", "DELETE", "OPTIONS"]
+    )
 
     from app.auth import auth_bp
     from app.readings import readings_bp
