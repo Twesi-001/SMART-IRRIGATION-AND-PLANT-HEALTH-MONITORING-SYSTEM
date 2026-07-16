@@ -8,15 +8,44 @@ import numpy as np # type: ignore
 
 predictions_bp = Blueprint("predictions", __name__, url_prefix="/api/predictions")
 
-# Load the trained ML model
-MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'irrigation_model_all_crops.pkl')
-try:
-    model = joblib.load(MODEL_PATH)
-    print(f"✅ ML model loaded from: {MODEL_PATH}")
-except Exception as e:
-    model = None
-    print(f"❌ Failed to load ML model: {e}")
+# ========== DEBUG: Try multiple possible paths ==========
+print("🔍 DEBUG: Starting model loading...")
+print(f"📂 Current working directory: {os.getcwd()}")
+print(f"📂 Files in current directory: {os.listdir('.')}")
 
+# Try multiple possible paths
+possible_paths = [
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), 'irrigation_model_all_crops.pkl'),
+    os.path.join(os.getcwd(), 'irrigation_model_all_crops.pkl'),
+    'irrigation_model_all_crops.pkl',
+    '/app/irrigation_model_all_crops.pkl',  # Docker path
+]
+
+MODEL_PATH = None
+for path in possible_paths:
+    print(f"🔍 Checking path: {path}")
+    if os.path.exists(path):
+        MODEL_PATH = path
+        print(f"✅ Found model at: {MODEL_PATH}")
+        break
+
+if MODEL_PATH is None:
+    print("❌ Model file not found in any of the expected locations")
+    print("📂 All files in current directory:", os.listdir('.'))
+
+# Load the model
+model = None
+if MODEL_PATH:
+    try:
+        model = joblib.load(MODEL_PATH)
+        print(f"✅ ML model loaded successfully from: {MODEL_PATH}")
+    except Exception as e:
+        model = None
+        print(f"❌ Failed to load ML model: {e}")
+else:
+    print("❌ Skipping model load - no model file found")
+
+# ========== DEBUG END ==========
 
 @predictions_bp.route("", methods=["POST"])
 @require_device_key
@@ -103,6 +132,7 @@ def predict_from_sensor():
     
     # If ML model is not available, fall back to threshold-based
     if model is None:
+        print("⚠️ Using fallback threshold-based prediction (model is None)")
         threshold = float(node.moisture_threshold) if node.moisture_threshold else 30.0
         irrigation_needed = soil_moisture < threshold
         diff = abs(soil_moisture - threshold)
@@ -119,7 +149,9 @@ def predict_from_sensor():
             irrigation_needed = bool(prediction)
             recommended_action = "Water now" if irrigation_needed else "No irrigation needed"
             model_version = "random_forest_v2"
+            print(f"✅ ML prediction: node_id={node_id}, irrigate={irrigation_needed}, confidence={confidence:.2f}")
         except Exception as e:
+            print(f"❌ ML prediction failed: {e}")
             return jsonify({"error": f"ML prediction failed: {str(e)}"}), 500
     
     # Get the latest reading for this node to associate the prediction
