@@ -8,7 +8,7 @@ import numpy as np # type: ignore
 
 predictions_bp = Blueprint("predictions", __name__, url_prefix="/api/predictions")
 
-# ========== DEBUG: Try multiple possible paths ==========
+# ========== DEBUG: Print environment info ==========
 print("🔍 DEBUG: Starting model loading...")
 print(f"📂 Current working directory: {os.getcwd()}")
 print(f"📂 Files in current directory: {os.listdir('.')}")
@@ -17,8 +17,8 @@ print(f"📂 Files in current directory: {os.listdir('.')}")
 possible_paths = [
     os.path.join(os.path.dirname(os.path.dirname(__file__)), 'irrigation_model_all_crops.pkl'),
     os.path.join(os.getcwd(), 'irrigation_model_all_crops.pkl'),
-    'irrigation_model_all_crops.pkl',
     '/app/irrigation_model_all_crops.pkl',  # Docker path
+    'irrigation_model_all_crops.pkl',
 ]
 
 MODEL_PATH = None
@@ -32,19 +32,15 @@ for path in possible_paths:
 if MODEL_PATH is None:
     print("❌ Model file not found in any of the expected locations")
     print("📂 All files in current directory:", os.listdir('.'))
-
-# Load the model
-model = None
-if MODEL_PATH:
+    model = None
+else:
     try:
         model = joblib.load(MODEL_PATH)
         print(f"✅ ML model loaded successfully from: {MODEL_PATH}")
+        print(f"📊 Model type: {type(model)}")
     except Exception as e:
         model = None
         print(f"❌ Failed to load ML model: {e}")
-else:
-    print("❌ Skipping model load - no model file found")
-
 # ========== DEBUG END ==========
 
 @predictions_bp.route("", methods=["POST"])
@@ -78,7 +74,6 @@ def submit_prediction():
 
     return jsonify(prediction.to_dict()), 201
 
-
 @predictions_bp.route("/latest", methods=["GET"])
 def latest_prediction():
     node_id = request.args.get("node_id", 1, type=int)
@@ -91,7 +86,6 @@ def latest_prediction():
     if not prediction:
         return jsonify({"error": "no predictions found for this node"}), 404
     return jsonify(prediction.to_dict()), 200
-
 
 @predictions_bp.route("/history", methods=["GET"])
 def prediction_history():
@@ -106,7 +100,6 @@ def prediction_history():
         .all()
     )
     return jsonify([p.to_dict() for p in predictions]), 200
-
 
 @predictions_bp.route("/predict", methods=["POST"])
 @require_device_key
