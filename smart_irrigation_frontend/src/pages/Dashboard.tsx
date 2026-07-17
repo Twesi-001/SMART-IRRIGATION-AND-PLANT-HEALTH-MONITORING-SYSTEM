@@ -22,6 +22,19 @@ const Dashboard: React.FC = () => {
   // Track previous alerts for toast notifications
   const previousAlertsRef = useRef<Alert[]>([]);
 
+  // Format time in Uganda local time (UTC+3)
+  const formatLocalTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-UG', {
+      timeZone: 'Africa/Kampala',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
   const fetchData = async () => {
     try {
       const [dashboardRes, readingsRes, alertsRes] = await Promise.all([
@@ -62,7 +75,7 @@ const Dashboard: React.FC = () => {
                   <p className="text-sm font-bold">{alert.alert_type}</p>
                   <p className="text-sm">{alert.message}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {alert.severity} • {new Date(alert.created_at).toLocaleString()}
+                    {alert.severity} • {formatLocalTime(alert.created_at)}
                   </p>
                 </div>
                 <button

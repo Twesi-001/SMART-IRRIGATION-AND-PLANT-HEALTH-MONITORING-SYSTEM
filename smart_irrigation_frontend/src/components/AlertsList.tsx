@@ -24,68 +24,82 @@ const AlertsList: React.FC<AlertsListProps> = ({ alerts, onResolve }) => {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'CRITICAL':
-        return 'bg-red-100 border-red-500 text-red-700';
+        return 'bg-red-50 border-l-4 border-red-500 text-red-800';
       case 'WARNING':
-        return 'bg-yellow-100 border-yellow-500 text-yellow-700';
+        return 'bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800';
       case 'INFO':
-        return 'bg-blue-100 border-blue-500 text-blue-700';
+        return 'bg-blue-50 border-l-4 border-blue-500 text-blue-800';
       default:
-        return 'bg-gray-100 border-gray-500 text-gray-700';
+        return 'bg-gray-50 border-l-4 border-gray-400 text-gray-800';
     }
   };
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
       case 'CRITICAL':
-        return <XCircleIcon className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0" />;
+        return <XCircleIcon className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />;
       case 'WARNING':
-        return <ExclamationTriangleIcon className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 flex-shrink-0" />;
+        return <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />;
       case 'INFO':
-        return <CheckCircleIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />;
+        return <CheckCircleIcon className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />;
       default:
-        return null;
+        return <ExclamationTriangleIcon className="h-5 w-5 text-gray-500 flex-shrink-0 mt-0.5" />;
     }
   };
 
+  // Format time in Uganda local time (UTC+3)
+  const formatLocalTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-UG', {
+      timeZone: 'Africa/Kampala',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow p-3 sm:p-4">
-      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center">
-        <ExclamationTriangleIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-yellow-600" />
-        Alerts <span className="ml-2 text-sm font-normal text-gray-500">({alerts.length})</span>
+    <div className="bg-white rounded-lg shadow p-4">
+      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+        <ExclamationTriangleIcon className="h-5 w-5 mr-2 text-yellow-500" />
+        Alerts
+        <span className="ml-2 text-sm font-normal text-gray-500">({alerts.length})</span>
       </h3>
 
       {alerts.length === 0 ? (
-        <div className="text-center py-4 sm:py-8 text-gray-500">
-          <CheckCircleIcon className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-green-500 mb-2" />
-          <p className="text-sm sm:text-base">No active alerts</p>
-          <p className="text-xs sm:text-sm">All systems normal</p>
+        <div className="text-center py-8 text-gray-500">
+          <CheckCircleIcon className="h-12 w-12 mx-auto text-green-500 mb-2" />
+          <p className="text-base">No active alerts</p>
+          <p className="text-sm text-gray-400">All systems normal ✅</p>
         </div>
       ) : (
-        <div className="space-y-2 sm:space-y-3 max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
           {alerts.map((alert) => (
             <div
               key={alert.id}
-              className={`p-2 sm:p-3 rounded-lg border-l-4 ${getSeverityColor(alert.severity)}`}
+              className={`p-3 rounded-lg shadow-sm ${getSeverityColor(alert.severity)}`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start space-x-2 min-w-0">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-3 flex-1">
                   {getSeverityIcon(alert.severity)}
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                      <span className="text-sm sm:text-base font-medium break-words">{alert.alert_type}</span>
-                      <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-white bg-opacity-50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold">{alert.alert_type}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full bg-white/50`}>
                         {alert.severity}
                       </span>
+                      <span className="text-xs text-gray-500">
+                        {formatLocalTime(alert.created_at)}
+                      </span>
                     </div>
-                    <p className="text-xs sm:text-sm break-words">{alert.message}</p>
-                    <p className="text-[10px] sm:text-xs opacity-70 mt-0.5 sm:mt-1">
-                      {new Date(alert.created_at).toLocaleString()}
-                    </p>
+                    <p className="text-sm mt-0.5">{alert.message}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => handleResolve(alert.id)}
-                  className="text-xs sm:text-sm text-green-600 hover:text-green-800 font-medium whitespace-nowrap"
+                  className="ml-2 px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors whitespace-nowrap"
                 >
                   Resolve
                 </button>
