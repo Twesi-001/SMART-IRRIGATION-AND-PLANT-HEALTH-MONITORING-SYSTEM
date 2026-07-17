@@ -86,7 +86,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 {/* Notification Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-w-[calc(100vw-2rem)] left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0">
                     <div className="p-3 border-b border-gray-200">
                       <h4 className="text-sm font-semibold">Notifications</h4>
                     </div>
@@ -104,7 +104,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         onClick={() => {
                           setShowNotifications(false);
                           navigate('/dashboard');
-                          // Small delay to allow navigation, then scroll to alerts
                           setTimeout(() => {
                             const alertsSection = document.getElementById('alerts-section');
                             if (alertsSection) {
@@ -112,7 +111,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             }
                           }, 100);
                         }}
-                        className="text-sm text-green-600 hover:text-green-800 w-full text-center py-2"
+                        className="text-sm text-green-600 hover:text-green-800 w-full text-center py-2 border-t border-gray-100 mt-1"
                       >
                         View all alerts
                       </button>
