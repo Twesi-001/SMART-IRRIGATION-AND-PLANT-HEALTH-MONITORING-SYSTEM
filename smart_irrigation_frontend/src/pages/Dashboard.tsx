@@ -159,9 +159,10 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Alerts and Pump Control - Responsive layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+      {/* Alerts and Pump Control */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
         <div className="lg:col-span-2">
-          <AlertsList alerts={alerts} />
+          <AlertsList alerts={alerts} onResolve={fetchData} />
         </div>
         <div>
           <PumpControl
