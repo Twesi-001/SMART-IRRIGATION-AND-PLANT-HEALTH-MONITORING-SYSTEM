@@ -49,17 +49,18 @@ const AlertsList: React.FC<AlertsListProps> = ({ alerts, onResolve }) => {
 
   // Format time in Uganda local time (UTC+3)
   const formatLocalTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-UG', {
-      timeZone: 'Africa/Kampala',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-  };
-
+  const date = new Date(dateString);
+  // Add 3 hours for Uganda time (UTC+3)
+  date.setHours(date.getHours() + 3);
+  return date.toLocaleString('en-UG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
   return (
     <div className="bg-white rounded-lg shadow p-4">
       <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
