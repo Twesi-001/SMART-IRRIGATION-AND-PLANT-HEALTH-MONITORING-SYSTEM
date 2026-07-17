@@ -34,8 +34,20 @@ interface ChartComponentProps {
 }
 
 const ChartComponent: React.FC<ChartComponentProps> = ({ readings, title = 'Sensor History' }) => {
+  // Format time in Uganda local time (UTC+3) with AM/PM
+  const formatLocalTime = (dateString: string) => {
+    const date = new Date(dateString);
+    // Add 3 hours for Uganda time (UTC+3)
+    date.setHours(date.getHours() + 3);
+    return date.toLocaleString('en-UG', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   const data = {
-    labels: readings.map(r => new Date(r.recorded_at).toLocaleTimeString()),
+    labels: readings.map(r => formatLocalTime(r.recorded_at)),
     datasets: [
       {
         label: 'Soil Moisture (%)',
