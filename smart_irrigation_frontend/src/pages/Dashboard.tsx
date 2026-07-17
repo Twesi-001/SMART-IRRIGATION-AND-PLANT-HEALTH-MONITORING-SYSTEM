@@ -2,8 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dashboardService, readingsService, pumpService, alertService } from '../services/api';
-import { DashboardSummary, SensorReading, Alert } from '../types';
+import { dashboardService, readingsService, pumpService, alertService, nodeService } from '../services/api';
+import { DashboardSummary, SensorReading, Alert, SensorNode } from '../types';
 import toast from 'react-hot-toast';
 import StatCard from '../components/StatCard';
 import SensorGauge from '../components/SensorGauge';
@@ -17,47 +17,78 @@ const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [nodes, setNodes] = useState<SensorNode[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<number>(1);
   const [refreshing, setRefreshing] = useState(false);
   
   // Track previous alerts for toast notifications
   const previousAlertsRef = useRef<Alert[]>([]);
 
   // Format time in Uganda local time (UTC+3)
-const formatLocalTime = (dateString: string) => {
-  const date = new Date(dateString);
-  // Add 3 hours for Uganda time (UTC+3)
-  date.setHours(date.getHours() + 3);
-  return date.toLocaleString('en-UG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true // ← This adds AM/PM
-  });
-};
+  const formatLocalTime = (dateString: string) => {
+    const date = new Date(dateString);
+    date.setHours(date.getHours() + 3);
+    return date.toLocaleString('en-UG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  // Crop icons mapping
+  const cropIcons: { [key: string]: string } = {
+    'Maize': '🌽',
+    'Tomato': '🍅',
+    'Cabbage': '🥬',
+    'Onion': '🧅',
+    'Mango': '🥭',
+    'Banana': '🍌',
+    'Pineapple': '🍍',
+    'Carrot': '🥕',
+    'Capsicum': '🫑',
+    'Eggplant': '🍆',
+    'Sukuma Wiki': '🥬',
+    'Spinach': '🌿',
+    'Beans': '🫘',
+    'Garlic': '🧄',
+    'Strawberry': '🍓',
+    'Lettuce': '🥗',
+    'Cucumber': '🥒',
+    'Watermelon': '🍉',
+    'Pumpkin': '🎃',
+    'Passion Fruit': '🍈',
+  };
+
+  const getCropIcon = (cropType: string | null) => {
+    if (!cropType) return '🌱';
+    return cropIcons[cropType] || '🌱';
+  };
+
   const fetchData = async () => {
     try {
-      const [dashboardRes, readingsRes, alertsRes] = await Promise.all([
-        dashboardService.getSummary(1),
-        readingsService.getReadings(1, 20),
-        alertService.getUnresolved(1),
+      const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
+        dashboardService.getSummary(selectedNodeId),
+        readingsService.getReadings(selectedNodeId, 20),
+        alertService.getUnresolved(selectedNodeId),
+        nodeService.getAll(),
       ]);
 
       setDashboardData(dashboardRes.data);
       setReadings(readingsRes.data);
+      setNodes(nodesRes.data);
       
-      // Check for new alerts before updating state
+      // Check for new alerts
       const newAlerts = alertsRes.data;
       const oldAlerts = previousAlertsRef.current;
       
-      // Find new alerts (alerts that weren't there before)
       if (newAlerts.length > 0 && oldAlerts.length > 0) {
         const addedAlerts = newAlerts.filter(
           alert => !oldAlerts.some(prev => prev.id === alert.id)
         );
         
-        // Show toast for each new alert
         addedAlerts.forEach((alert: Alert) => {
           const severityColors = {
             CRITICAL: 'bg-red-100 text-red-800 border-red-500',
@@ -94,9 +125,7 @@ const formatLocalTime = (dateString: string) => {
         });
       }
       
-      // Update alerts state
       setAlerts(newAlerts);
-      // Update previous alerts ref
       previousAlertsRef.current = newAlerts;
       
     } catch (error) {
@@ -107,13 +136,20 @@ const formatLocalTime = (dateString: string) => {
     }
   };
 
+  const handleNodeSelect = (nodeId: number) => {
+    setSelectedNodeId(nodeId);
+    setLoading(true);
+    fetchData();
+  };
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => {
       fetchData();
     }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNodeId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -124,7 +160,7 @@ const formatLocalTime = (dateString: string) => {
 
   const handleTogglePump = async () => {
     try {
-      await pumpService.toggle(1);
+      await pumpService.toggle(selectedNodeId);
       toast.success('Pump toggled!');
       fetchData();
     } catch (error) {
@@ -167,6 +203,39 @@ const formatLocalTime = (dateString: string) => {
         >
           {refreshing ? 'Refreshing...' : 'Refresh Data'}
         </button>
+      </div>
+
+      {/* Nodes Grid - Your Gardens */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+          🌱 Your Gardens
+          <span className="ml-2 text-sm font-normal text-gray-500">({nodes.length})</span>
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {nodes.map((n) => (
+            <div
+              key={n.id}
+              onClick={() => handleNodeSelect(n.id)}
+              className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                selectedNodeId === n.id
+                  ? 'border-green-500 bg-green-50 shadow-md'
+                  : 'border-gray-200 bg-white hover:border-green-300 hover:shadow'
+              }`}
+            >
+              <div className="text-2xl text-center">{getCropIcon(n.crop_type)}</div>
+              <div className="text-center mt-1">
+                <p className="text-sm font-medium text-gray-800 truncate">{n.node_name}</p>
+                <p className="text-xs text-gray-500">{n.crop_type || 'Unknown'}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Threshold: {n.moisture_threshold}%</p>
+                <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${
+                  n.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {n.is_active ? '✅ Active' : '❌ Inactive'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Stats Cards - Responsive grid */}
