@@ -2,8 +2,8 @@
 import React, { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { 
-  HomeIcon, 
+import {
+  HomeIcon,
   PowerIcon,
   BellIcon,
   UserCircleIcon,
@@ -59,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-4">
-              <button 
+              <button
                 onClick={() => navigate('/dashboard')}
                 className="text-gray-700 hover:text-green-700 px-3 py-2 rounded-md text-sm font-medium flex items-center"
               >
@@ -104,6 +104,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         onClick={() => {
                           setShowNotifications(false);
                           navigate('/dashboard');
+                          // Small delay to allow navigation, then scroll to alerts
+                          setTimeout(() => {
+                            const alertsSection = document.getElementById('alerts-section');
+                            if (alertsSection) {
+                              alertsSection.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }, 100);
                         }}
                         className="text-sm text-green-600 hover:text-green-800 w-full text-center py-2"
                       >
@@ -147,7 +154,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="md:hidden py-2 border-t border-gray-200">
-              <button 
+              <button
                 onClick={() => {
                   navigate('/dashboard');
                   setMobileMenuOpen(false);
