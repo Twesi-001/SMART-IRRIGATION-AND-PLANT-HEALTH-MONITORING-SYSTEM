@@ -48,7 +48,7 @@ const AlertsList: React.FC<AlertsListProps> = ({ alerts, onResolve }) => {
   };
 
   // Format time in Uganda local time (UTC+3)
-  const formatLocalTime = (dateString: string) => {
+ const formatLocalTime = (dateString: string) => {
   const date = new Date(dateString);
   // Add 3 hours for Uganda time (UTC+3)
   date.setHours(date.getHours() + 3);
@@ -58,7 +58,7 @@ const AlertsList: React.FC<AlertsListProps> = ({ alerts, onResolve }) => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hour12: true // ← This adds AM/PM
   });
 };
   return (

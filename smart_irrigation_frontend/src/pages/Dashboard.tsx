@@ -23,7 +23,7 @@ const Dashboard: React.FC = () => {
   const previousAlertsRef = useRef<Alert[]>([]);
 
   // Format time in Uganda local time (UTC+3)
-  const formatLocalTime = (dateString: string) => {
+const formatLocalTime = (dateString: string) => {
   const date = new Date(dateString);
   // Add 3 hours for Uganda time (UTC+3)
   date.setHours(date.getHours() + 3);
@@ -33,7 +33,7 @@ const Dashboard: React.FC = () => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hour12: true // ← This adds AM/PM
   });
 };
   const fetchData = async () => {
