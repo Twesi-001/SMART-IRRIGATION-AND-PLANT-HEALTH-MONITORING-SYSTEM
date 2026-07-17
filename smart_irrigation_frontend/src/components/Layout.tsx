@@ -1,4 +1,5 @@
-import React, { ReactNode, useState } from 'react';
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -9,6 +10,7 @@ import {
   Bars3Icon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
+import { alertService } from '../services/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,6 +20,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unresolvedCount, setUnresolvedCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const fetchAlertCount = async () => {
+    try {
+      const response = await alertService.getUnresolved();
+      setUnresolvedCount(response.data.length);
+    } catch (error) {
+      console.error('Failed to fetch alerts:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlertCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchAlertCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -30,14 +50,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <nav className="bg-white shadow-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo - Always visible */}
+            {/* Logo */}
             <div className="flex items-center">
               <h1 className="text-lg sm:text-xl font-bold text-green-700">
                 🌱 Smart Irrigation
               </h1>
             </div>
 
-            {/* Desktop Navigation - Hidden on mobile */}
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-4">
               <button 
                 onClick={() => navigate('/dashboard')}
@@ -48,11 +68,53 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             </div>
 
-            {/* Right side - Always visible */}
+            {/* Right side */}
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <BellIcon className="h-5 w-5 sm:h-6 sm:w-6 text-gray-500 hover:text-gray-700 cursor-pointer" />
-              
-              {/* User info - Hidden on very small screens */}
+              {/* Notification Bell */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative p-1 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  <BellIcon className="h-6 w-6" />
+                  {unresolvedCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {unresolvedCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notification Dropdown */}
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    <div className="p-3 border-b border-gray-200">
+                      <h4 className="text-sm font-semibold">Notifications</h4>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-2">
+                      {unresolvedCount === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-4">
+                          ✅ No active alerts
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-600 p-2">
+                          You have {unresolvedCount} active alert(s)
+                        </p>
+                      )}
+                      <button
+                        onClick={() => {
+                          setShowNotifications(false);
+                          navigate('/dashboard');
+                        }}
+                        className="text-sm text-green-600 hover:text-green-800 w-full text-center py-2"
+                      >
+                        View all alerts
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* User info */}
               <div className="hidden xs:flex items-center space-x-2">
                 <UserCircleIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-500" />
                 <span className="text-xs sm:text-sm text-gray-700 hidden sm:inline">
@@ -82,7 +144,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
 
-          {/* Mobile Menu - Hidden on desktop */}
+          {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="md:hidden py-2 border-t border-gray-200">
               <button 
