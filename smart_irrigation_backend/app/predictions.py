@@ -5,6 +5,7 @@ from app.device_auth import require_device_key
 import joblib # type: ignore
 import os
 import numpy as np # type: ignore
+import pandas as pd # type: ignore
 
 predictions_bp = Blueprint("predictions", __name__, url_prefix="/api/predictions")
 
@@ -33,6 +34,9 @@ if MODEL_PATH:
         print(f"❌ Failed to load ML model: {e}")
 else:
     model_load_error = "Model file not found in any expected location"
+
+# Define feature names for the model
+FEATURE_NAMES = ['soil_moisture', 'temperature', 'humidity', 'node_id']
 
 @predictions_bp.route("", methods=["POST"])
 @require_device_key
@@ -124,19 +128,20 @@ def predict_from_sensor():
         recommended_action = "Water now" if irrigation_needed else "No irrigation needed"
         model_version = "fallback_threshold"
         
-        # 🔍 DEBUG: Return info about why model failed
         debug_info = {
             "model_loaded": False,
             "model_path": MODEL_PATH,
-            "model_error": model_load_error,
-            "cwd": os.getcwd(),
-            "files_in_cwd": os.listdir('.')[:10]  # First 10 files
+            "model_error": model_load_error
         }
         
     else:
-        # Use ML model
+        # Use ML model with DataFrame to avoid warnings
         try:
-            features = np.array([[soil_moisture, temperature, humidity, node_id]])
+            # Create DataFrame with feature names to avoid warning
+            features = pd.DataFrame(
+                [[soil_moisture, temperature, humidity, node_id]],
+                columns=FEATURE_NAMES
+            )
             prediction = model.predict(features)[0]
             confidence = float(max(model.predict_proba(features)[0]))
             irrigation_needed = bool(prediction)
@@ -174,7 +179,7 @@ def predict_from_sensor():
             "model_version": model_version,
             "prediction_id": prediction_record.id,
             "reading_id": latest_reading.id,
-            "debug": debug_info  # ← ADD DEBUG INFO
+            "debug": debug_info
         }
         return jsonify(response_data), 200
     else:
