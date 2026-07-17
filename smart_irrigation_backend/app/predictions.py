@@ -8,40 +8,31 @@ import numpy as np # type: ignore
 
 predictions_bp = Blueprint("predictions", __name__, url_prefix="/api/predictions")
 
-# ========== DEBUG: Print environment info ==========
-print("🔍 DEBUG: Starting model loading...")
-print(f"📂 Current working directory: {os.getcwd()}")
-print(f"📂 Files in current directory: {os.listdir('.')}")
-
 # Try multiple possible paths
 possible_paths = [
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), 'irrigation_model_all_crops.pkl'),
-    os.path.join(os.getcwd(), 'irrigation_model_all_crops.pkl'),
     '/app/irrigation_model_all_crops.pkl',  # Docker path
+    os.path.join(os.getcwd(), 'irrigation_model_all_crops.pkl'),
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), 'irrigation_model_all_crops.pkl'),
     'irrigation_model_all_crops.pkl',
 ]
 
 MODEL_PATH = None
 for path in possible_paths:
-    print(f"🔍 Checking path: {path}")
     if os.path.exists(path):
         MODEL_PATH = path
-        print(f"✅ Found model at: {MODEL_PATH}")
         break
 
-if MODEL_PATH is None:
-    print("❌ Model file not found in any of the expected locations")
-    print("📂 All files in current directory:", os.listdir('.'))
-    model = None
-else:
+model = None
+model_load_error = None
+if MODEL_PATH:
     try:
         model = joblib.load(MODEL_PATH)
-        print(f"✅ ML model loaded successfully from: {MODEL_PATH}")
-        print(f"📊 Model type: {type(model)}")
+        print(f"✅ ML model loaded from: {MODEL_PATH}")
     except Exception as e:
-        model = None
+        model_load_error = str(e)
         print(f"❌ Failed to load ML model: {e}")
-# ========== DEBUG END ==========
+else:
+    model_load_error = "Model file not found in any expected location"
 
 @predictions_bp.route("", methods=["POST"])
 @require_device_key
@@ -133,6 +124,15 @@ def predict_from_sensor():
         recommended_action = "Water now" if irrigation_needed else "No irrigation needed"
         model_version = "fallback_threshold"
         
+        # 🔍 DEBUG: Return info about why model failed
+        debug_info = {
+            "model_loaded": False,
+            "model_path": MODEL_PATH,
+            "model_error": model_load_error,
+            "cwd": os.getcwd(),
+            "files_in_cwd": os.listdir('.')[:10]  # First 10 files
+        }
+        
     else:
         # Use ML model
         try:
@@ -143,6 +143,7 @@ def predict_from_sensor():
             recommended_action = "Water now" if irrigation_needed else "No irrigation needed"
             model_version = "random_forest_v2"
             print(f"✅ ML prediction: node_id={node_id}, irrigate={irrigation_needed}, confidence={confidence:.2f}")
+            debug_info = {"model_loaded": True}
         except Exception as e:
             print(f"❌ ML prediction failed: {e}")
             return jsonify({"error": f"ML prediction failed: {str(e)}"}), 500
@@ -162,7 +163,7 @@ def predict_from_sensor():
         db.session.add(prediction_record)
         db.session.commit()
         
-        return jsonify({
+        response_data = {
             "node_id": node_id,
             "soil_moisture": soil_moisture,
             "temperature": temperature,
@@ -172,8 +173,10 @@ def predict_from_sensor():
             "confidence": confidence,
             "model_version": model_version,
             "prediction_id": prediction_record.id,
-            "reading_id": latest_reading.id
-        }), 200
+            "reading_id": latest_reading.id,
+            "debug": debug_info  # ← ADD DEBUG INFO
+        }
+        return jsonify(response_data), 200
     else:
         return jsonify({
             "node_id": node_id,
@@ -184,5 +187,6 @@ def predict_from_sensor():
             "recommended_action": recommended_action,
             "confidence": confidence,
             "model_version": model_version,
-            "message": "Prediction not saved (no reading found for this node)"
+            "message": "Prediction not saved (no reading found for this node)",
+            "debug": debug_info
         }), 200
