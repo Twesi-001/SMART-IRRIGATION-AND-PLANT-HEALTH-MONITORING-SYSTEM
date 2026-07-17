@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService, readingsService, pumpService, alertService } from '../services/api';
 import { DashboardSummary, SensorReading, Alert } from '../types';
@@ -18,6 +18,9 @@ const Dashboard: React.FC = () => {
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Track previous alerts for toast notifications
+  const previousAlertsRef = useRef<Alert[]>([]);
 
   const fetchData = async () => {
     try {
@@ -29,7 +32,59 @@ const Dashboard: React.FC = () => {
 
       setDashboardData(dashboardRes.data);
       setReadings(readingsRes.data);
-      setAlerts(alertsRes.data);
+      
+      // Check for new alerts before updating state
+      const newAlerts = alertsRes.data;
+      const oldAlerts = previousAlertsRef.current;
+      
+      // Find new alerts (alerts that weren't there before)
+      if (newAlerts.length > 0 && oldAlerts.length > 0) {
+        const addedAlerts = newAlerts.filter(
+          alert => !oldAlerts.some(prev => prev.id === alert.id)
+        );
+        
+        // Show toast for each new alert
+        addedAlerts.forEach((alert: Alert) => {
+          const severityColors = {
+            CRITICAL: 'bg-red-100 text-red-800 border-red-500',
+            WARNING: 'bg-yellow-100 text-yellow-800 border-yellow-500',
+            INFO: 'bg-blue-100 text-blue-800 border-blue-500',
+          };
+          
+          const colorClass = severityColors[alert.severity as keyof typeof severityColors] || 'bg-gray-100 border-gray-500';
+          
+          toast.custom((t) => (
+            <div
+              className={`max-w-sm w-full shadow-lg rounded-lg border-l-4 ${colorClass} p-4`}
+            >
+              <div className="flex items-start">
+                <div className="flex-1">
+                  <p className="text-sm font-bold">{alert.alert_type}</p>
+                  <p className="text-sm">{alert.message}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {alert.severity} • {new Date(alert.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="ml-4 text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ), {
+            duration: 5000,
+            position: 'top-right',
+          });
+        });
+      }
+      
+      // Update alerts state
+      setAlerts(newAlerts);
+      // Update previous alerts ref
+      previousAlertsRef.current = newAlerts;
+      
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to fetch dashboard data');
@@ -159,7 +214,6 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Alerts and Pump Control - Responsive layout */}
-      {/* Alerts and Pump Control */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
         <div className="lg:col-span-2">
           <AlertsList alerts={alerts} onResolve={fetchData} />
