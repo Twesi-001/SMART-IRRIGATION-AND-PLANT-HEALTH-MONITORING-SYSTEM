@@ -9,7 +9,7 @@ import {
 } from '../types';
 
 // ✅ Use environment variable for API URL
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const API_KEY = import.meta.env.VITE_API_KEY || 'A0Wt_9n-2o7uL1MNuzsrUTCD2BioR_Fq3ZF1BnVK7gw';
 
 console.log('API_URL:', API_URL); // Should show the Render URL in production
