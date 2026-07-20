@@ -201,15 +201,14 @@ const Dashboard: React.FC = () => {
   };
 
   const handleViewFarmer = (farmer: Farmer) => {
-    if (farmer.nodes.length > 0) {
-      handleNodeSelect(farmer.nodes[0].id);
-      setShowFarmersList(false);
-      toast.success(`Viewing ${farmer.user.username}'s garden`);
-    } else {
-      toast(`${farmer.user.username} has no gardens yet`, { icon: 'ℹ️' });
-    }
-  };
-
+  if (farmer.nodes.length > 0) {
+    handleNodeSelect(farmer.nodes[0].id);
+    setShowFarmersList(false);
+    toast.success(`Viewing ${farmer.user.username}'s garden`);
+  } else {
+    toast(`${farmer.user.username} has no gardens yet`, { icon: 'ℹ️' });  // ← FIXED
+  }
+};
   const handleSendRecommendation = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -231,11 +230,9 @@ const Dashboard: React.FC = () => {
         toast.success('Recommendation sent successfully!');
         setShowRecommendForm(false);
         setRecommendation({ farmer_id: 0, node_id: 0, message: '' });
-        // ✅ Refresh alerts after sending
         if (selectedNodeId) {
           await fetchData(selectedNodeId);
         }
-        // ✅ Refresh farmers list if open
         if (showFarmersList) {
           await fetchFarmers();
         }
@@ -271,12 +268,16 @@ const Dashboard: React.FC = () => {
         const nodes = response.data;
         setAllNodes(nodes);
         
-        if (nodes.length > 0) {
-          const favoriteNode = nodes.find((n) => favorites.includes(n.id));
-          const initialNode = favoriteNode || nodes[0];
-          setSelectedNodeId(initialNode.id);
-          await fetchData(initialNode.id);
+        if (nodes.length === 0) {
+          setLoading(false);
+          toast('No gardens found. Please create a garden first.', { icon: 'ℹ️' });
+          return;
         }
+        
+        const favoriteNode = nodes.find((n) => favorites.includes(n.id));
+        const initialNode = favoriteNode || nodes[0];
+        setSelectedNodeId(initialNode.id);
+        await fetchData(initialNode.id);
         setLoading(false);
       } catch (error) {
         console.error('Error loading initial node:', error);
@@ -285,7 +286,6 @@ const Dashboard: React.FC = () => {
     };
     loadInitialNode();
     
-    // ✅ Preload farmers for Extension Officers and Admins
     if (isExtensionOfficer) {
       fetchFarmers();
     }
@@ -321,8 +321,9 @@ const Dashboard: React.FC = () => {
 
   if (!dashboardData || selectedNodeId === null) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-base sm:text-xl text-red-600">Failed to load dashboard data</div>
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="text-base sm:text-xl text-gray-600">No gardens found</div>
+        <p className="text-sm text-gray-400 mt-2">Create a new garden to get started</p>
       </div>
     );
   }
@@ -330,7 +331,6 @@ const Dashboard: React.FC = () => {
   const { node, latest_reading, statistics, pump_status } = dashboardData;
   const favoriteNodes = allNodes.filter((n) => favorites.includes(n.id));
 
-  // Get nodes for selected farmer in recommendation form
   const farmerNodes = allNodes.filter((n) => n.user_id === recommendation.farmer_id);
 
   return (
@@ -613,10 +613,16 @@ const Dashboard: React.FC = () => {
           <AlertsList alerts={alerts} onResolve={() => selectedNodeId && fetchData(selectedNodeId)} />
         </div>
         <div>
-          <PumpControl
-            status={pump_status}
-            onToggle={handleTogglePump}
-          />
+          {user?.role === 'farmer' ? (
+            <PumpControl
+              status={pump_status}
+              onToggle={handleTogglePump}
+            />
+          ) : (
+            <div className="bg-gray-100 rounded-lg shadow p-4 text-center text-gray-500">
+              <p className="text-sm">🔒 Pump control is only available for farmers</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
