@@ -28,7 +28,6 @@ interface Farmer {
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
