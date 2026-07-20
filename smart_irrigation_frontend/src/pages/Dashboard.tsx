@@ -140,7 +140,8 @@ const Dashboard: React.FC = () => {
       
       if (response.ok) {
         toast.success('Garden created successfully!');
-        window.location.reload();
+        // ✅ Fix: Navigate to dashboard instead of reload
+        window.location.href = '/dashboard';
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to create garden');
