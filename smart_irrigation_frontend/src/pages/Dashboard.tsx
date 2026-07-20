@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +10,18 @@ import AlertsList from '../components/AlertsList';
 import PumpControl from '../components/PumpControl';
 import ChartComponent from '../components/ChartComponent';
 import NodeSelector from '../components/NodeSelector';
+
+interface Farmer {
+  user: {
+    id: number;
+    username: string;
+    email: string | null;
+    role: string;
+    created_at: string;
+  };
+  node_count: number;
+  nodes: SensorNode[];
+}
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -26,7 +37,13 @@ const Dashboard: React.FC = () => {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [showFarmersList, setShowFarmersList] = useState(false);
-  const [farmers, setFarmers] = useState<any[]>([]);
+  const [farmers, setFarmers] = useState<Farmer[]>([]);
+  const [showRecommendForm, setShowRecommendForm] = useState(false);
+  const [recommendation, setRecommendation] = useState({
+    farmer_id: 0,
+    node_id: 0,
+    message: ''
+  });
   
   const previousAlertsRef = useRef<Alert[]>([]);
 
@@ -50,7 +67,7 @@ const Dashboard: React.FC = () => {
   };
 
   // Crop icons mapping
-  const cropIcons: { [key: string]: string } = {
+  const cropIcons: Record<string, string> = {
     'Maize': '🌽',
     'Tomato': '🍅',
     'Cabbage': '🥬',
@@ -180,6 +197,48 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleViewFarmer = (farmer: Farmer) => {
+    if (farmer.nodes.length > 0) {
+      handleNodeSelect(farmer.nodes[0].id);
+      setShowFarmersList(false);
+      toast.success(`Viewing ${farmer.user.username}'s garden`);
+    } else {
+      toast(`${farmer.user.username} has no gardens yet`, { icon: 'ℹ️' });
+    }
+  };
+
+  const handleSendRecommendation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/alerts/recommend', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          farmer_id: recommendation.farmer_id,
+          node_id: recommendation.node_id,
+          message: recommendation.message
+        })
+      });
+      
+      if (response.ok) {
+        toast.success('Recommendation sent successfully!');
+        setShowRecommendForm(false);
+        setRecommendation({ farmer_id: 0, node_id: 0, message: '' });
+        if (selectedNodeId) {
+          fetchData(selectedNodeId);
+        }
+      } else {
+        toast.error('Failed to send recommendation');
+      }
+    } catch (error) {
+      toast.error('Error sending recommendation');
+    }
+  };
+
   const handleNodeSelect = (nodeId: number) => {
     setSelectedNodeId(nodeId);
     setLoading(true);
@@ -187,9 +246,9 @@ const Dashboard: React.FC = () => {
   };
 
   const handleToggleFavorite = (nodeId: number) => {
-    setFavorites(prev => {
+    setFavorites((prev) => {
       if (prev.includes(nodeId)) {
-        return prev.filter(id => id !== nodeId);
+        return prev.filter((id) => id !== nodeId);
       } else {
         return [...prev, nodeId];
       }
@@ -205,7 +264,7 @@ const Dashboard: React.FC = () => {
         setAllNodes(nodes);
         
         if (nodes.length > 0) {
-          const favoriteNode = nodes.find(n => favorites.includes(n.id));
+          const favoriteNode = nodes.find((n) => favorites.includes(n.id));
           const initialNode = favoriteNode || nodes[0];
           setSelectedNodeId(initialNode.id);
           await fetchData(initialNode.id);
@@ -256,8 +315,11 @@ const Dashboard: React.FC = () => {
   }
 
   const { node, latest_reading, statistics, pump_status } = dashboardData;
-  const favoriteNodes = allNodes.filter(n => favorites.includes(n.id));
-  const isExtensionOfficer = user?.role === 'extension_officer';
+  const favoriteNodes = allNodes.filter((n) => favorites.includes(n.id));
+  const isExtensionOfficer = user?.role === 'extension_officer' || user?.role === 'admin';
+
+  // Get nodes for selected farmer in recommendation form
+  const farmerNodes = allNodes.filter((n) => n.user_id === recommendation.farmer_id);
 
   return (
     <div>
@@ -291,62 +353,142 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Extension Officer: View All Farmers Button */}
+      {/* Extension Officer / Admin: View All Farmers Button */}
       {isExtensionOfficer && (
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap gap-2">
           <button
             onClick={fetchFarmers}
             className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
           >
             👨‍🌾 View All Farmers
           </button>
+          <button
+            onClick={() => setShowRecommendForm(true)}
+            className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+          >
+            📝 Send Recommendation
+          </button>
         </div>
       )}
 
-      {/* Farmers List (Extension Officer) */}
-      {showFarmersList && isExtensionOfficer && (
+      {/* Recommendation Form */}
+      {showRecommendForm && isExtensionOfficer && (
         <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-semibold mb-3">📝 Send Recommendation</h3>
+          <form onSubmit={handleSendRecommendation}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="farmer-select">
+                  Farmer
+                </label>
+                <select
+                  id="farmer-select"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={recommendation.farmer_id}
+                  onChange={(e) => setRecommendation({ ...recommendation, farmer_id: Number(e.target.value) })}
+                  required
+                >
+                  <option value={0}>Select farmer</option>
+                  {farmers.map((farmer) => (
+                    <option key={farmer.user.id} value={farmer.user.id}>
+                      {farmer.user.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="node-select">
+                  Garden
+                </label>
+                <select
+                  id="node-select"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={recommendation.node_id}
+                  onChange={(e) => setRecommendation({ ...recommendation, node_id: Number(e.target.value) })}
+                  required
+                >
+                  <option value={0}>Select garden</option>
+                  {farmerNodes.map((node) => (
+                    <option key={node.id} value={node.id}>
+                      {node.node_name} ({node.crop_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="message-textarea">
+                Message
+              </label>
+              <textarea
+                id="message-textarea"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                rows={3}
+                value={recommendation.message}
+                onChange={(e) => setRecommendation({ ...recommendation, message: e.target.value })}
+                placeholder="Enter your recommendation for the farmer..."
+                required
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+              >
+                Send Recommendation
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecommendForm(false);
+                  setRecommendation({ farmer_id: 0, node_id: 0, message: '' });
+                }}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Farmers List (Extension Officer / Admin) */}
+      {showFarmersList && isExtensionOfficer && (
+        <div className="mb-6 bg-white rounded-lg shadow p-4 overflow-x-auto">
           <h3 className="text-lg font-semibold mb-3">All Farmers</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">Farmer</th>
-                  <th className="text-left py-2">Gardens</th>
-                  <th className="text-left py-2">Status</th>
-                  <th className="text-left py-2">Action</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2">Farmer</th>
+                <th className="text-left py-2">Gardens</th>
+                <th className="text-left py-2">Status</th>
+                <th className="text-left py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {farmers.map((farmer) => (
+                <tr key={farmer.user.id} className="border-b hover:bg-gray-50">
+                  <td className="py-2">{farmer.user.username}</td>
+                  <td className="py-2">{farmer.node_count}</td>
+                  <td className="py-2">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      farmer.node_count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {farmer.node_count > 0 ? '✅ Active' : '❌ No gardens'}
+                    </span>
+                  </td>
+                  <td className="py-2">
+                    <button
+                      onClick={() => handleViewFarmer(farmer)}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      View
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {farmers.map((farmer: any) => (
-                  <tr key={farmer.user.id} className="border-b hover:bg-gray-50">
-                    <td className="py-2">{farmer.user.username}</td>
-                    <td className="py-2">{farmer.node_count}</td>
-                    <td className="py-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        farmer.node_count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {farmer.node_count > 0 ? '✅ Active' : '❌ No gardens'}
-                      </span>
-                    </td>
-                    <td className="py-2">
-                      <button
-                        onClick={() => {
-                          if (farmer.nodes.length > 0) {
-                            handleNodeSelect(farmer.nodes[0].id);
-                            setShowFarmersList(false);
-                          }
-                        }}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
           <button
             onClick={() => setShowFarmersList(false)}
             className="mt-3 text-gray-500 hover:text-gray-700 text-sm"
