@@ -10,7 +10,7 @@ import {
   Bars3Icon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
-import { alertService } from '../services/api';
+import { alertService, nodeService } from '../services/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -25,10 +25,33 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const fetchAlertCount = async () => {
     try {
-      const response = await alertService.getUnresolved();
-      setUnresolvedCount(response.data.length);
+      // Get user's nodes
+      const nodesResponse = await nodeService.getAll();
+      const userNodes = nodesResponse.data;
+      
+      // If user has no nodes, count is 0
+      if (userNodes.length === 0) {
+        setUnresolvedCount(0);
+        return;
+      }
+      
+      // Get node IDs for the user
+      const nodeIds = userNodes.map((node) => node.id);
+      
+      // Fetch alerts for all user's nodes
+      let totalUnresolved = 0;
+      for (const nodeId of nodeIds) {
+        try {
+          const response = await alertService.getUnresolved(nodeId);
+          totalUnresolved += response.data.length;
+        } catch (error) {
+          console.error(`Failed to fetch alerts for node ${nodeId}:`, error);
+        }
+      }
+      
+      setUnresolvedCount(totalUnresolved);
     } catch (error) {
-      console.error('Failed to fetch alerts:', error);
+      console.error('Failed to fetch alert count:', error);
     }
   };
 
