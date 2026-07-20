@@ -46,13 +46,15 @@ const Dashboard: React.FC = () => {
     node_id: 0,
     message: ''
   });
-  // State for the "Add Garden" form (moved to top level)
+  // State for the "Add Garden" form
   const [cropType, setCropType] = useState('');
   const [nodeName, setNodeName] = useState('');
+  const [showAddGardenForm, setShowAddGardenForm] = useState(false);
   
   const previousAlertsRef = useRef<Alert[]>([]);
 
   const isExtensionOfficer = user?.role === 'extension_officer' || user?.role === 'admin';
+  const isFarmer = user?.role === 'farmer';
 
   // Save favorites to localStorage
   useEffect(() => {
@@ -435,6 +437,15 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+          {/* ✅ Add Garden button - ONLY for farmers (all farmers, with or without gardens) */}
+          {isFarmer && (
+            <button
+              onClick={() => setShowAddGardenForm(!showAddGardenForm)}
+              className="w-full sm:w-auto bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center gap-1"
+            >
+              {showAddGardenForm ? '✕ Close' : '➕ Add Garden'}
+            </button>
+          )}
           <NodeSelector
             selectedNodeId={selectedNodeId}
             onSelectNode={handleNodeSelect}
@@ -450,6 +461,86 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ✅ Add Garden Form - ONLY for farmers */}
+      {isFarmer && showAddGardenForm && (
+        <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-semibold text-gray-800">🌱 Add New Garden</h3>
+            <button
+              onClick={() => {
+                setShowAddGardenForm(false);
+                setCropType('');
+                setNodeName('');
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (nodeName.trim() && cropType) {
+              await createNode(nodeName.trim(), cropType, cropThresholds[cropType]);
+            }
+          }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="garden-name">
+                  Garden Name
+                </label>
+                <input
+                  id="garden-name"
+                  type="text"
+                  value={nodeName}
+                  onChange={(e) => setNodeName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="e.g., My Garden"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="crop-select">
+                  Crop Type
+                </label>
+                <select
+                  id="crop-select"
+                  value={cropType}
+                  onChange={(e) => setCropType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                >
+                  <option value="">Select a crop</option>
+                  {cropTypes.map((crop) => (
+                    <option key={crop} value={crop}>
+                      {crop} (Threshold: {cropThresholds[crop]}%)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+              >
+                Create Garden
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddGardenForm(false);
+                  setCropType('');
+                  setNodeName('');
+                }}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Extension Officer / Admin: View All Farmers Button */}
       {isExtensionOfficer && (
