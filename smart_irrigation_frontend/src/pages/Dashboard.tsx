@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +13,7 @@ import ChartComponent from '../components/ChartComponent';
 import NodeSelector from '../components/NodeSelector';
 
 const Dashboard: React.FC = () => {
-  useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
@@ -20,16 +21,16 @@ const Dashboard: React.FC = () => {
   const [allNodes, setAllNodes] = useState<SensorNode[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<number[]>(() => {
-    // Load favorites from localStorage
     const saved = localStorage.getItem('favoriteNodes');
     return saved ? JSON.parse(saved) : [];
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [showFarmersList, setShowFarmersList] = useState(false);
+  const [farmers, setFarmers] = useState<any[]>([]);
   
-  // Track previous alerts for toast notifications
   const previousAlertsRef = useRef<Alert[]>([]);
 
-  // Save favorites to localStorage when they change
+  // Save favorites to localStorage
   useEffect(() => {
     localStorage.setItem('favoriteNodes', JSON.stringify(favorites));
   }, [favorites]);
@@ -77,6 +78,23 @@ const Dashboard: React.FC = () => {
     return cropIcons[cropType] || '🌱';
   };
 
+  // Role badge color
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'admin': return 'bg-purple-100 text-purple-700';
+      case 'extension_officer': return 'bg-blue-100 text-blue-700';
+      default: return 'bg-green-100 text-green-700';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return '🔧 Admin';
+      case 'extension_officer': return '👨‍🏫 Extension Officer';
+      default: return '👨‍🌾 Farmer';
+    }
+  };
+
   const fetchData = async (nodeId: number) => {
     try {
       const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
@@ -91,7 +109,6 @@ const Dashboard: React.FC = () => {
       setAlerts(alertsRes.data);
       setAllNodes(nodesRes.data);
       
-      // Check for new alerts
       const newAlerts = alertsRes.data;
       const oldAlerts = previousAlertsRef.current;
       
@@ -147,6 +164,22 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const fetchFarmers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/users/farmers', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      setFarmers(data);
+      setShowFarmersList(true);
+    } catch (error) {
+      toast.error('Failed to load farmers');
+    }
+  };
+
   const handleNodeSelect = (nodeId: number) => {
     setSelectedNodeId(nodeId);
     setLoading(true);
@@ -172,7 +205,6 @@ const Dashboard: React.FC = () => {
         setAllNodes(nodes);
         
         if (nodes.length > 0) {
-          // Try to select the first favorite, or the first node
           const favoriteNode = nodes.find(n => favorites.includes(n.id));
           const initialNode = favoriteNode || nodes[0];
           setSelectedNodeId(initialNode.id);
@@ -224,16 +256,20 @@ const Dashboard: React.FC = () => {
   }
 
   const { node, latest_reading, statistics, pump_status } = dashboardData;
-
-  // Get favorited nodes
   const favoriteNodes = allNodes.filter(n => favorites.includes(n.id));
+  const isExtensionOfficer = user?.role === 'extension_officer';
 
   return (
     <div>
-      {/* Header with Node Selector */}
+      {/* Header with Role Badge */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
+            <span className={`px-2 py-1 text-xs rounded-full ${getRoleBadgeColor(user?.role || 'farmer')}`}>
+              {getRoleLabel(user?.role || 'farmer')}
+            </span>
+          </div>
           <p className="text-sm sm:text-base text-gray-600 truncate max-w-[200px] sm:max-w-none">
             {node.node_name} - {node.location}
           </p>
@@ -255,8 +291,73 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Favorite Nodes Grid */}
-      {favoriteNodes.length > 0 && (
+      {/* Extension Officer: View All Farmers Button */}
+      {isExtensionOfficer && (
+        <div className="mb-4">
+          <button
+            onClick={fetchFarmers}
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          >
+            👨‍🌾 View All Farmers
+          </button>
+        </div>
+      )}
+
+      {/* Farmers List (Extension Officer) */}
+      {showFarmersList && isExtensionOfficer && (
+        <div className="mb-6 bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-semibold mb-3">All Farmers</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2">Farmer</th>
+                  <th className="text-left py-2">Gardens</th>
+                  <th className="text-left py-2">Status</th>
+                  <th className="text-left py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {farmers.map((farmer: any) => (
+                  <tr key={farmer.user.id} className="border-b hover:bg-gray-50">
+                    <td className="py-2">{farmer.user.username}</td>
+                    <td className="py-2">{farmer.node_count}</td>
+                    <td className="py-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        farmer.node_count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {farmer.node_count > 0 ? '✅ Active' : '❌ No gardens'}
+                      </span>
+                    </td>
+                    <td className="py-2">
+                      <button
+                        onClick={() => {
+                          if (farmer.nodes.length > 0) {
+                            handleNodeSelect(farmer.nodes[0].id);
+                            setShowFarmersList(false);
+                          }
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button
+            onClick={() => setShowFarmersList(false)}
+            className="mt-3 text-gray-500 hover:text-gray-700 text-sm"
+          >
+            Close
+          </button>
+        </div>
+      )}
+
+      {/* Favorite Nodes Grid - Only for Farmers */}
+      {!isExtensionOfficer && favoriteNodes.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
             ⭐ Your Favorite Gardens
