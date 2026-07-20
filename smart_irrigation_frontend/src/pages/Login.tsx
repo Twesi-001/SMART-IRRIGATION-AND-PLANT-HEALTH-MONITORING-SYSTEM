@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -26,7 +26,7 @@ const Login: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-500 to-green-700">
       <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Smart Irrigation</h1>
+          <h1 className="text-3xl font-bold text-gray-800">🌱 Smart Irrigation</h1>
           <p className="text-gray-600 mt-2">Plant Health Monitoring System</p>
         </div>
         
@@ -40,6 +40,7 @@ const Login: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Enter username"
               required
             />
           </div>
@@ -53,6 +54,7 @@ const Login: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Enter password"
               required
             />
           </div>
@@ -68,6 +70,14 @@ const Login: React.FC = () => {
         
         <div className="mt-4 text-center text-sm text-gray-600">
           <p>Demo: testuser / test123</p>
+        </div>
+
+        {/* Signup Link */}
+        <div className="mt-4 text-center text-sm text-gray-600 border-t pt-4">
+          Don't have an account?{' '}
+          <Link to="/signup" className="text-green-600 hover:text-green-800 font-medium">
+            Sign up
+          </Link>
         </div>
       </div>
     </div>

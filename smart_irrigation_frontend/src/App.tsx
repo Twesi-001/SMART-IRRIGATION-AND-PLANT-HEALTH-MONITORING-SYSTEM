@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Layout from './components/Layout';
-// ❌ Remove: import './App.css';
+import Signup from './pages/Signup';
+
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -27,6 +28,7 @@ function AppRoutes() {
           </Layout>
         </ProtectedRoute>
       } />
+      <Route path="/signup" element={<Signup />} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   );
