@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +9,7 @@ import SensorGauge from '../components/SensorGauge';
 import AlertsList from '../components/AlertsList';
 import PumpControl from '../components/PumpControl';
 import ChartComponent from '../components/ChartComponent';
+import NodeSelector from '../components/NodeSelector';
 
 const Dashboard: React.FC = () => {
   useAuth();
@@ -17,12 +17,22 @@ const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [nodes, setNodes] = useState<SensorNode[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<number>(1);
+  const [allNodes, setAllNodes] = useState<SensorNode[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [favorites, setFavorites] = useState<number[]>(() => {
+    // Load favorites from localStorage
+    const saved = localStorage.getItem('favoriteNodes');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [refreshing, setRefreshing] = useState(false);
   
   // Track previous alerts for toast notifications
   const previousAlertsRef = useRef<Alert[]>([]);
+
+  // Save favorites to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('favoriteNodes', JSON.stringify(favorites));
+  }, [favorites]);
 
   // Format time in Uganda local time (UTC+3)
   const formatLocalTime = (dateString: string) => {
@@ -67,18 +77,19 @@ const Dashboard: React.FC = () => {
     return cropIcons[cropType] || '🌱';
   };
 
-  const fetchData = async () => {
+  const fetchData = async (nodeId: number) => {
     try {
       const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
-        dashboardService.getSummary(selectedNodeId),
-        readingsService.getReadings(selectedNodeId, 20),
-        alertService.getUnresolved(selectedNodeId),
+        dashboardService.getSummary(nodeId),
+        readingsService.getReadings(nodeId, 20),
+        alertService.getUnresolved(nodeId),
         nodeService.getAll(),
       ]);
 
       setDashboardData(dashboardRes.data);
       setReadings(readingsRes.data);
-      setNodes(nodesRes.data);
+      setAlerts(alertsRes.data);
+      setAllNodes(nodesRes.data);
       
       // Check for new alerts
       const newAlerts = alertsRes.data;
@@ -139,30 +150,58 @@ const Dashboard: React.FC = () => {
   const handleNodeSelect = (nodeId: number) => {
     setSelectedNodeId(nodeId);
     setLoading(true);
-    fetchData();
+    fetchData(nodeId);
   };
 
+  const handleToggleFavorite = (nodeId: number) => {
+    setFavorites(prev => {
+      if (prev.includes(nodeId)) {
+        return prev.filter(id => id !== nodeId);
+      } else {
+        return [...prev, nodeId];
+      }
+    });
+  };
+
+  // Load initial node
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-    }, 30000);
-    return () => clearInterval(interval);
+    const loadInitialNode = async () => {
+      try {
+        const response = await nodeService.getAll();
+        const nodes = response.data;
+        setAllNodes(nodes);
+        
+        if (nodes.length > 0) {
+          // Try to select the first favorite, or the first node
+          const favoriteNode = nodes.find(n => favorites.includes(n.id));
+          const initialNode = favoriteNode || nodes[0];
+          setSelectedNodeId(initialNode.id);
+          await fetchData(initialNode.id);
+        }
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading initial node:', error);
+        setLoading(false);
+      }
+    };
+    loadInitialNode();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedNodeId]);
+  }, []);
 
   const handleRefresh = async () => {
+    if (selectedNodeId === null) return;
     setRefreshing(true);
-    await fetchData();
+    await fetchData(selectedNodeId);
     setRefreshing(false);
     toast.success('Data refreshed!');
   };
 
   const handleTogglePump = async () => {
+    if (selectedNodeId === null) return;
     try {
       await pumpService.toggle(selectedNodeId);
       toast.success('Pump toggled!');
-      fetchData();
+      fetchData(selectedNodeId);
     } catch (error) {
       toast.error('Failed to toggle pump');
     }
@@ -176,7 +215,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (!dashboardData) {
+  if (!dashboardData || selectedNodeId === null) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-base sm:text-xl text-red-600">Failed to load dashboard data</div>
@@ -186,9 +225,12 @@ const Dashboard: React.FC = () => {
 
   const { node, latest_reading, statistics, pump_status } = dashboardData;
 
+  // Get favorited nodes
+  const favoriteNodes = allNodes.filter(n => favorites.includes(n.id));
+
   return (
     <div>
-      {/* Header */}
+      {/* Header with Node Selector */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
@@ -196,47 +238,58 @@ const Dashboard: React.FC = () => {
             {node.node_name} - {node.location}
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="w-full sm:w-auto bg-green-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm sm:text-base"
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh Data'}
-        </button>
-      </div>
-
-      {/* Nodes Grid - Your Gardens */}
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
-          🌱 Your Gardens
-          <span className="ml-2 text-sm font-normal text-gray-500">({nodes.length})</span>
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {nodes.map((n) => (
-            <div
-              key={n.id}
-              onClick={() => handleNodeSelect(n.id)}
-              className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                selectedNodeId === n.id
-                  ? 'border-green-500 bg-green-50 shadow-md'
-                  : 'border-gray-200 bg-white hover:border-green-300 hover:shadow'
-              }`}
-            >
-              <div className="text-2xl text-center">{getCropIcon(n.crop_type)}</div>
-              <div className="text-center mt-1">
-                <p className="text-sm font-medium text-gray-800 truncate">{n.node_name}</p>
-                <p className="text-xs text-gray-500">{n.crop_type || 'Unknown'}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Threshold: {n.moisture_threshold}%</p>
-                <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${
-                  n.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {n.is_active ? '✅ Active' : '❌ Inactive'}
-                </span>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+          <NodeSelector
+            selectedNodeId={selectedNodeId}
+            onSelectNode={handleNodeSelect}
+            favorites={favorites}
+            onToggleFavorite={handleToggleFavorite}
+          />
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="w-full sm:w-auto bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </button>
         </div>
       </div>
+
+      {/* Favorite Nodes Grid */}
+      {favoriteNodes.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+            ⭐ Your Favorite Gardens
+            <span className="ml-2 text-sm font-normal text-gray-500">({favoriteNodes.length})</span>
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {favoriteNodes.map((n) => (
+              <div
+                key={n.id}
+                onClick={() => handleNodeSelect(n.id)}
+                className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                  selectedNodeId === n.id
+                    ? 'border-green-500 bg-green-50 shadow-md'
+                    : 'border-gray-200 bg-white hover:border-green-300 hover:shadow'
+                }`}
+              >
+                <div className="text-2xl text-center">{getCropIcon(n.crop_type)}</div>
+                <div className="text-center mt-1">
+                  <p className="text-sm font-medium text-gray-800 truncate">{n.node_name}</p>
+                  <p className="text-xs text-gray-500">{n.crop_type || 'Unknown'}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Threshold: {n.moisture_threshold}%</p>
+                  <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${
+                    n.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {n.is_active ? '✅ Active' : '❌ Inactive'}
+                  </span>
+                  <div className="mt-1 text-yellow-500">★</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards - Responsive grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6">
@@ -299,7 +352,7 @@ const Dashboard: React.FC = () => {
       {/* Alerts and Pump Control - Responsive layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
         <div className="lg:col-span-2">
-          <AlertsList alerts={alerts} onResolve={fetchData} />
+          <AlertsList alerts={alerts} onResolve={() => selectedNodeId && fetchData(selectedNodeId)} />
         </div>
         <div>
           <PumpControl
