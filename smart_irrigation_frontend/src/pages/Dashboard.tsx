@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -46,6 +47,8 @@ const Dashboard: React.FC = () => {
   });
   
   const previousAlertsRef = useRef<Alert[]>([]);
+
+  const isExtensionOfficer = user?.role === 'extension_officer' || user?.role === 'admin';
 
   // Save favorites to localStorage
   useEffect(() => {
@@ -218,8 +221,8 @@ const Dashboard: React.FC = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          farmer_id: recommendation.farmer_id,
-          node_id: recommendation.node_id,
+          farmer_id: Number(recommendation.farmer_id),
+          node_id: Number(recommendation.node_id),
           message: recommendation.message
         })
       });
@@ -228,8 +231,13 @@ const Dashboard: React.FC = () => {
         toast.success('Recommendation sent successfully!');
         setShowRecommendForm(false);
         setRecommendation({ farmer_id: 0, node_id: 0, message: '' });
+        // ✅ Refresh alerts after sending
         if (selectedNodeId) {
-          fetchData(selectedNodeId);
+          await fetchData(selectedNodeId);
+        }
+        // ✅ Refresh farmers list if open
+        if (showFarmersList) {
+          await fetchFarmers();
         }
       } else {
         toast.error('Failed to send recommendation');
@@ -276,6 +284,11 @@ const Dashboard: React.FC = () => {
       }
     };
     loadInitialNode();
+    
+    // ✅ Preload farmers for Extension Officers and Admins
+    if (isExtensionOfficer) {
+      fetchFarmers();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -316,7 +329,6 @@ const Dashboard: React.FC = () => {
 
   const { node, latest_reading, statistics, pump_status } = dashboardData;
   const favoriteNodes = allNodes.filter((n) => favorites.includes(n.id));
-  const isExtensionOfficer = user?.role === 'extension_officer' || user?.role === 'admin';
 
   // Get nodes for selected farmer in recommendation form
   const farmerNodes = allNodes.filter((n) => n.user_id === recommendation.farmer_id);
@@ -357,7 +369,10 @@ const Dashboard: React.FC = () => {
       {isExtensionOfficer && (
         <div className="mb-4 flex flex-wrap gap-2">
           <button
-            onClick={fetchFarmers}
+            onClick={() => {
+              fetchFarmers();
+              setShowFarmersList(true);
+            }}
             className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
           >
             👨‍🌾 View All Farmers
