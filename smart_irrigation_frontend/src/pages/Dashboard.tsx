@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { dashboardService, readingsService, pumpService, alertService, nodeService } from '../services/api';
 import { DashboardSummary, SensorReading, Alert, SensorNode } from '../types';
 import toast from 'react-hot-toast';
@@ -122,35 +121,35 @@ const Dashboard: React.FC = () => {
     }
   };
 
- const createNode = async (nodeName: string, cropType: string, threshold: number) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        node_name: nodeName,
-        crop_type: cropType,
-        moisture_threshold: threshold,
-        location: 'Mbarara, Uganda'
-      })
-    });
-    
-    if (response.ok) {
-      toast.success('Garden created successfully!');
-      // ✅ Go to root
-      window.location.href = '/';
-    } else {
-      const error = await response.json();
-      toast.error(error.error || 'Failed to create garden');
+  const createNode = async (nodeName: string, cropType: string, threshold: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          node_name: nodeName,
+          crop_type: cropType,
+          moisture_threshold: threshold,
+          location: 'Mbarara, Uganda'
+        })
+      });
+      
+      if (response.ok) {
+        toast.success('Garden created successfully!');
+        window.location.href = '/';
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to create garden');
+      }
+    } catch (error) {
+      toast.error('Error creating garden');
     }
-  } catch (error) {
-    toast.error('Error creating garden');
-  }
-};
+  };
+
   const fetchData = async (nodeId: number) => {
     try {
       const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
