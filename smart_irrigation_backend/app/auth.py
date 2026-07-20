@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token
+from flask import Blueprint, request, jsonify # type: ignore
+from flask_jwt_extended import create_access_token # type: ignore
 from app.extensions import db
 from app.models import User
 
@@ -46,6 +46,10 @@ def login():
 
     access_token = create_access_token(
         identity=str(user.id),
-        additional_claims={"username": user.username, "role": user.role},
+        additional_claims={
+            "username": user.username,
+            "role": user.role,
+            "user_id": user.id  # ← ADDED THIS
+        },
     )
     return jsonify({"access_token": access_token, "user": user.to_dict()}), 200

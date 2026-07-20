@@ -1,5 +1,5 @@
 from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash # type: ignore
 from app.extensions import db
 
 
@@ -39,6 +39,7 @@ class SensorNode(db.Model):
     moisture_threshold = db.Column(db.Numeric(5, 2), default=30.00)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)  # ← ADD THIS
 
     readings = db.relationship("SensorReading", backref="node", cascade="all, delete-orphan")
 
@@ -50,8 +51,8 @@ class SensorNode(db.Model):
             "crop_type": self.crop_type,
             "moisture_threshold": float(self.moisture_threshold) if self.moisture_threshold is not None else None,
             "is_active": self.is_active,
+            "user_id": self.user_id, 
         }
-
 
 class SensorReading(db.Model):
     __tablename__ = "sensor_readings"

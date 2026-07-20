@@ -1,14 +1,24 @@
 from flask import Blueprint, request, jsonify # type: ignore
-from flask_jwt_extended import jwt_required # type: ignore
+from flask_jwt_extended import jwt_required, get_jwt_identity # type: ignore
 from app.extensions import db
-from app.models import SensorNode
+from app.models import SensorNode, User
 
 nodes_bp = Blueprint("nodes", __name__, url_prefix="/api/nodes")
 
 
 @nodes_bp.route("", methods=["GET"])
+@jwt_required()  # ← Added JWT required
 def list_nodes():
-    nodes = SensorNode.query.all()
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if user.role == 'farmer':
+        # Farmers see only their own nodes
+        nodes = SensorNode.query.filter_by(user_id=current_user_id).all()
+    else:
+        # Admins and extension officers see all nodes
+        nodes = SensorNode.query.all()
+    
     return jsonify([n.to_dict() for n in nodes]), 200
 
 
@@ -20,11 +30,19 @@ def create_node():
     if not node_name:
         return jsonify({"error": "node_name is required"}), 400
 
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    # Only farmers and admins can create nodes
+    if user.role not in ['farmer', 'admin']:
+        return jsonify({"error": "Only farmers and admins can create nodes"}), 403
+
     node = SensorNode(
         node_name=node_name,
         location=data.get("location"),
         crop_type=data.get("crop_type"),
         moisture_threshold=data.get("moisture_threshold", 30.00),
+        user_id=current_user_id if user.role == 'farmer' else data.get("user_id", current_user_id)
     )
     db.session.add(node)
     db.session.commit()
@@ -32,11 +50,20 @@ def create_node():
 
 
 @nodes_bp.route("/<int:node_id>", methods=["GET"])
+@jwt_required()  # ← Added JWT required
 def get_node(node_id):
     """Get a specific node by ID"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     node = SensorNode.query.get(node_id)
+    
     if not node:
         return jsonify({"error": f"node_id {node_id} does not exist"}), 404
+    
+    # Check permissions
+    if user.role == 'farmer' and node.user_id != current_user_id:
+        return jsonify({"error": "You don't have permission to view this node"}), 403
+    
     return jsonify(node.to_dict()), 200
 
 
@@ -44,9 +71,19 @@ def get_node(node_id):
 @jwt_required()
 def update_node(node_id):
     """Update a specific node"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     node = SensorNode.query.get(node_id)
+    
     if not node:
         return jsonify({"error": f"node_id {node_id} does not exist"}), 404
+    
+    # Check permissions
+    if user.role == 'farmer' and node.user_id != current_user_id:
+        return jsonify({"error": "You don't have permission to update this node"}), 403
+    
+    if user.role == 'extension_officer':
+        return jsonify({"error": "Extension officers cannot update nodes"}), 403
     
     data = request.get_json(silent=True) or {}
     
@@ -69,9 +106,19 @@ def update_node(node_id):
 @jwt_required()
 def delete_node(node_id):
     """Delete a specific node"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     node = SensorNode.query.get(node_id)
+    
     if not node:
         return jsonify({"error": f"node_id {node_id} does not exist"}), 404
+    
+    # Only admins and the node owner can delete
+    if user.role == 'farmer' and node.user_id != current_user_id:
+        return jsonify({"error": "You don't have permission to delete this node"}), 403
+    
+    if user.role == 'extension_officer':
+        return jsonify({"error": "Extension officers cannot delete nodes"}), 403
     
     if node.readings:
         return jsonify({"error": "Cannot delete node with existing readings"}), 400
@@ -82,11 +129,19 @@ def delete_node(node_id):
 
 
 @nodes_bp.route("/<int:node_id>/status", methods=["GET"])
+@jwt_required()  # ← Added JWT required
 def get_node_status(node_id):
     """Get a summary of node status including latest reading"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     node = SensorNode.query.get(node_id)
+    
     if not node:
         return jsonify({"error": f"node_id {node_id} does not exist"}), 404
+    
+    # Check permissions
+    if user.role == 'farmer' and node.user_id != current_user_id:
+        return jsonify({"error": "You don't have permission to view this node"}), 403
     
     from app.models import SensorReading, Alert, PumpCommand
     from sqlalchemy import desc # type: ignore
