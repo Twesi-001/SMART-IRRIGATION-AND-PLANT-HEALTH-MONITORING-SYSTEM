@@ -1,8 +1,8 @@
 from datetime import datetime
 from flask import Blueprint, request, jsonify # type: ignore
-from flask_jwt_extended import jwt_required # type: ignore
+from flask_jwt_extended import jwt_required, get_jwt_identity # type: ignore
 from app.extensions import db
-from app.models import Alert, SensorNode
+from app.models import Alert, SensorNode, User
 from app.device_auth import require_device_key
 
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/api/alerts")
@@ -121,13 +121,29 @@ def get_unresolved_alerts():
 
 @alerts_bp.route("/summary", methods=["GET"])
 @jwt_required()
+def get_alerts_summary():
+    """Get summary of alerts (counts by node)"""
+    from sqlalchemy import func # type: ignore
+    
+    summary = db.session.query(
+        Alert.node_id,
+        func.count(Alert.id).label('unresolved_count')
+    ).filter_by(resolved=False).group_by(Alert.node_id).all()
+    
+    total_unresolved = Alert.query.filter_by(resolved=False).count()
+    
+    return jsonify({
+        'total_unresolved': total_unresolved,
+        'by_node': [{'node_id': s.node_id, 'count': s.unresolved_count} for s in summary]
+    }), 200
+
 
 @alerts_bp.route("/recommend", methods=["POST"])
 @jwt_required()
-def send_recommendation():
+def send_recommendation_to_farmer():
     """Send a recommendation from Extension Officer to a farmer"""
-    current_user_id = get_jwt_identity() # type: ignore
-    user = User.query.get(current_user_id) # type: ignore
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
     
     # Only extension officers and admins can send recommendations
     if user.role not in ['extension_officer', 'admin']:
@@ -142,7 +158,7 @@ def send_recommendation():
         return jsonify({"error": "farmer_id, node_id and message are required"}), 400
     
     # Check if farmer exists
-    farmer = User.query.get(farmer_id) # type: ignore
+    farmer = User.query.get(farmer_id)
     if not farmer or farmer.role != 'farmer':
         return jsonify({"error": "Farmer not found"}), 404
     
@@ -165,19 +181,3 @@ def send_recommendation():
         "message": "Recommendation sent successfully",
         "alert": alert.to_dict()
     }), 201
-
-def get_alerts_summary():
-    """Get summary of alerts (counts by node)"""
-    from sqlalchemy import func # type: ignore
-    
-    summary = db.session.query(
-        Alert.node_id,
-        func.count(Alert.id).label('unresolved_count')
-    ).filter_by(resolved=False).group_by(Alert.node_id).all()
-    
-    total_unresolved = Alert.query.filter_by(resolved=False).count()
-    
-    return jsonify({
-        'total_unresolved': total_unresolved,
-        'by_node': [{'node_id': s.node_id, 'count': s.unresolved_count} for s in summary]
-    }), 200
