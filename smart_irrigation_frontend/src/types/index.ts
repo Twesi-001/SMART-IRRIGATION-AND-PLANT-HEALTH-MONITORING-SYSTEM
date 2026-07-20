@@ -7,6 +7,7 @@ export interface User {
 }
 
 export interface SensorNode {
+  user_id: number;
   id: number;
   node_name: string;
   location: string | null;
