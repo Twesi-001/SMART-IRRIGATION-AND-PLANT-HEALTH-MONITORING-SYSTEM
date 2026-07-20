@@ -4,6 +4,7 @@ from flask_cors import CORS # type: ignore
 from app.config import Config
 from app.extensions import db, jwt
 from app.dashboard import dashboard_bp
+from app.users import users_bp
 
 
 def create_app(config_class=Config):
@@ -36,6 +37,7 @@ def create_app(config_class=Config):
     app.register_blueprint(alerts_bp)
     app.register_blueprint(nodes_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(users_bp)
 
     @app.route("/api/health", methods=["GET"])
     def health():

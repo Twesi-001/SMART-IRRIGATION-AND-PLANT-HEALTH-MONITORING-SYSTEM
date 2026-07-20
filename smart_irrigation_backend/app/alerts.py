@@ -121,6 +121,51 @@ def get_unresolved_alerts():
 
 @alerts_bp.route("/summary", methods=["GET"])
 @jwt_required()
+
+@alerts_bp.route("/recommend", methods=["POST"])
+@jwt_required()
+def send_recommendation():
+    """Send a recommendation from Extension Officer to a farmer"""
+    current_user_id = get_jwt_identity() # type: ignore
+    user = User.query.get(current_user_id) # type: ignore
+    
+    # Only extension officers and admins can send recommendations
+    if user.role not in ['extension_officer', 'admin']:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    data = request.get_json(silent=True) or {}
+    farmer_id = data.get("farmer_id")
+    message = data.get("message")
+    node_id = data.get("node_id")
+    
+    if not farmer_id or not message or not node_id:
+        return jsonify({"error": "farmer_id, node_id and message are required"}), 400
+    
+    # Check if farmer exists
+    farmer = User.query.get(farmer_id) # type: ignore
+    if not farmer or farmer.role != 'farmer':
+        return jsonify({"error": "Farmer not found"}), 404
+    
+    # Check if node exists and belongs to farmer
+    node = SensorNode.query.get(node_id)
+    if not node or node.user_id != farmer_id:
+        return jsonify({"error": "Node not found or does not belong to farmer"}), 404
+    
+    # Create alert for the farmer
+    alert = Alert(
+        node_id=node_id,
+        alert_type="RECOMMENDATION",
+        message=f"👨‍🏫 Recommendation from {user.username}: {message}",
+        severity="INFO"
+    )
+    db.session.add(alert)
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Recommendation sent successfully",
+        "alert": alert.to_dict()
+    }), 201
+
 def get_alerts_summary():
     """Get summary of alerts (counts by node)"""
     from sqlalchemy import func # type: ignore
