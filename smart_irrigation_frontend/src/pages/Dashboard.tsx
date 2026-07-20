@@ -1,6 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/rules-of-hooks */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService, readingsService, pumpService, alertService, nodeService } from '../services/api';
@@ -47,6 +46,9 @@ const Dashboard: React.FC = () => {
     node_id: 0,
     message: ''
   });
+  // State for the "Add Garden" form (moved to top level)
+  const [cropType, setCropType] = useState('');
+  const [nodeName, setNodeName] = useState('');
   
   const previousAlertsRef = useRef<Alert[]>([]);
 
@@ -352,9 +354,6 @@ const Dashboard: React.FC = () => {
   }
 
   if (!dashboardData || selectedNodeId === null) {
-    const [cropType, setCropType] = useState('');
-    const [nodeName, setNodeName] = useState('');
-    
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <div className="text-base sm:text-xl text-gray-600">🌱 No gardens found</div>
