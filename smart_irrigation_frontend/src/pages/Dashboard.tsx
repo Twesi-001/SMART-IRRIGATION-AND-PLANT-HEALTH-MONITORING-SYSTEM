@@ -299,27 +299,27 @@ const Dashboard: React.FC = () => {
   // Load initial node
   useEffect(() => {
     const loadInitialNode = async () => {
-      try {
-        const response = await nodeService.getAll();
-        const nodes = response.data;
-        setAllNodes(nodes);
-        
-        if (nodes.length === 0) {
-          setLoading(false);
-          toast('No gardens found. Please create a garden first.', { icon: 'ℹ️' });
-          return;
-        }
-        
-        const favoriteNode = nodes.find((n) => favorites.includes(n.id));
-        const initialNode = favoriteNode || nodes[0];
-        setSelectedNodeId(initialNode.id);
-        await fetchData(initialNode.id);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading initial node:', error);
-        setLoading(false);
-      }
-    };
+  try {
+    const response = await nodeService.getAll();
+    const nodes = response.data;
+    setAllNodes(nodes);
+    
+    if (nodes.length === 0) {
+      setLoading(false);
+      setSelectedNodeId(null);  // ← Show empty state
+      return;
+    }
+    
+    const favoriteNode = nodes.find((n) => favorites.includes(n.id));
+    const initialNode = favoriteNode || nodes[0];
+    setSelectedNodeId(initialNode.id);
+    await fetchData(initialNode.id);
+    setLoading(false);
+  } catch (error) {
+    console.error('Error loading initial node:', error);
+    setLoading(false);
+  }
+};
     loadInitialNode();
     
     if (isExtensionOfficer) {
