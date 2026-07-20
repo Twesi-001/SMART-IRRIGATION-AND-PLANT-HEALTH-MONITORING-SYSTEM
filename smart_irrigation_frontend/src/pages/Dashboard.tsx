@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { dashboardService, readingsService, pumpService, alertService, nodeService } from '../services/api';
 import { DashboardSummary, SensorReading, Alert, SensorNode } from '../types';
 import toast from 'react-hot-toast';
@@ -27,6 +28,7 @@ interface Farmer {
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
@@ -140,8 +142,7 @@ const Dashboard: React.FC = () => {
       
       if (response.ok) {
         toast.success('Garden created successfully!');
-        // ✅ Fix: Navigate to dashboard instead of reload
-        window.location.href = '/dashboard';
+        navigate('/dashboard');
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to create garden');
