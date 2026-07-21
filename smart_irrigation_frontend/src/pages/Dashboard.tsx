@@ -783,25 +783,41 @@ const Dashboard: React.FC = () => {
       <div className="bg-white p-3 sm:p-4 rounded-lg shadow mb-4 sm:mb-6">
         <ChartComponent readings={readings} title="Sensor History" />
       </div>
-
-      {/* Alerts and Pump Control - Responsive layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
-        <div className="lg:col-span-2">
-          <AlertsList alerts={alerts} onResolve={() => selectedNodeId && fetchData(selectedNodeId)} />
-        </div>
-        <div>
-          {user?.role === 'farmer' ? (
-            <PumpControl
-              status={pump_status}
-              onToggle={handleTogglePump}
-            />
-          ) : (
-            <div className="bg-gray-100 rounded-lg shadow p-4 text-center text-gray-500">
-              <p className="text-sm">🔒 Pump control is only available for farmers</p>
-            </div>
-          )}
-        </div>
+{/* Alerts and Pump Control - Responsive layout */}
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
+  <div className="lg:col-span-2">
+    <AlertsList alerts={alerts} onResolve={() => selectedNodeId && fetchData(selectedNodeId)} />
+  </div>
+  <div>
+    {user?.role === 'farmer' ? (
+      (() => {
+        // Calculate irrigation status
+        const threshold = node?.moisture_threshold || 35;
+        const currentMoisture = latest_reading?.soil_moisture || 0;
+        const irrigationNeeded = currentMoisture < threshold;
+        const canToggleOn = irrigationNeeded;
+        
+        return (
+          <PumpControl
+            status={pump_status}
+            onToggle={handleTogglePump}
+            irrigationNeeded={irrigationNeeded}
+            canToggleOn={canToggleOn}
+            soilMoisture={currentMoisture}
+            threshold={threshold}
+            message={irrigationNeeded 
+              ? "Soil is dry. Turn pump ON if needed." 
+              : `Soil moisture (${currentMoisture}%) is above threshold (${threshold}%). Pump locked OFF.`}
+          />
+        );
+      })()
+    ) : (
+      <div className="bg-gray-100 rounded-lg shadow p-4 text-center text-gray-500">
+        <p className="text-sm">🔒 Pump control is only available for farmers</p>
       </div>
+    )}
+  </div>
+</div>
     </div>
   );
 };
