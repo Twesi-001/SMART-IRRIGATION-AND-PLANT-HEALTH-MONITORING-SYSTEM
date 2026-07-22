@@ -64,11 +64,14 @@ const Dashboard: React.FC = () => {
         const nodes = response.data;
         setAllNodes(nodes);
 
-        // Filter nodes for farmers
+        // ✅ FIX: For farmers, use ALL returned nodes (already filtered by FarmerNode)
         let userNodes = nodes;
         if (user?.role === 'farmer') {
-          userNodes = nodes.filter((n) => n.user_id === user.id);
+          // The API already filters by FarmerNode, so all returned nodes belong to this farmer
+          userNodes = nodes;
         }
+
+        console.log('👨‍🌾 User nodes found:', userNodes.length);
 
         if (userNodes.length === 0) {
           setLoading(false);
@@ -94,6 +97,7 @@ const Dashboard: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
   // Format time in Uganda local time (UTC+3)
   const formatLocalTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -153,6 +157,7 @@ const Dashboard: React.FC = () => {
       default: return '👨‍🌾 Farmer';
     }
   };
+
   async function createNode(nodeName: string, cropType: string, _threshold: number) {
     try {
       const token = localStorage.getItem('token');
@@ -199,6 +204,7 @@ const Dashboard: React.FC = () => {
       toast.error('Error selecting garden');
     }
   }
+
   const fetchData = async (nodeId: number) => {
     try {
       const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
@@ -353,10 +359,11 @@ const Dashboard: React.FC = () => {
         const nodes = response.data;
         setAllNodes(nodes);
 
-        // Filter nodes that belong to the current user (for farmers)
+        // ✅ FIX: For farmers, use ALL returned nodes (already filtered by FarmerNode)
         let userNodes = nodes;
         if (user?.role === 'farmer') {
-          userNodes = nodes.filter((n) => n.user_id === user.id);
+          // The API already filters by FarmerNode, so all returned nodes belong to this farmer
+          userNodes = nodes;
         }
 
         if (userNodes.length === 0) {
