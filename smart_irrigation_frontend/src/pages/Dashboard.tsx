@@ -154,34 +154,50 @@ useEffect(() => {
     }
   };
 
-  const createNode = async (nodeName: string, cropType: string, threshold: number) => {
+  async function createNode({ nodeName, cropType }: { nodeName: string; cropType: string; _threshold: number; }): Promise<void> {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes', {
+
+      // ✅ Step 1: Get ALL existing nodes (1-20)
+      const allNodesResponse = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/all', {
+        headers: { 'X-API-Key': 'PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g' }
+      });
+      const allNodes = await allNodesResponse.json();
+
+      // ✅ Step 2: Find the existing node with matching crop type
+      const existingNode = allNodes.find((n: { crop_type: string; }) => n.crop_type === cropType);
+
+      if (!existingNode) {
+        toast.error(`No node found for crop: ${cropType}`);
+        return;
+      }
+
+      // ✅ Step 3: SELECT the existing node (NOT create new!)
+      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/select', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          node_name: nodeName,
-          crop_type: cropType,
-          moisture_threshold: threshold,
+          node_id: existingNode.id,
+          custom_name: nodeName,
           location: 'Mbarara, Uganda'
         })
       });
-      
+
       if (response.ok) {
-        toast.success('Garden created successfully!');
-        window.location.href = '/';
+        toast.success('Garden selected successfully!');
+        window.location.reload();
       } else {
         const error = await response.json();
-        toast.error(error.error || 'Failed to create garden');
+        toast.error(error.error || 'Failed to select garden');
       }
     } catch (error) {
-      toast.error('Error creating garden');
+      console.error('Error:', error);
+      toast.error('Error selecting garden');
     }
-  };
+  }
 
   const fetchData = async (nodeId: number) => {
     try {
@@ -405,7 +421,7 @@ useEffect(() => {
           <form onSubmit={async (e) => {
             e.preventDefault();
             if (nodeName.trim() && cropType) {
-              await createNode(nodeName.trim(), cropType, cropThresholds[cropType]);
+              await createNode({ nodeName: nodeName.trim(), cropType, _threshold: cropThresholds[cropType] });
             }
           }}>
             <div className="mb-3">
@@ -520,7 +536,7 @@ useEffect(() => {
           <form onSubmit={async (e) => {
             e.preventDefault();
             if (nodeName.trim() && cropType) {
-              await createNode(nodeName.trim(), cropType, cropThresholds[cropType]);
+              await createNode({ nodeName: nodeName.trim(), cropType, _threshold: cropThresholds[cropType] });
             }
           }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
