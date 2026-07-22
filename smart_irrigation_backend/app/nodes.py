@@ -235,7 +235,7 @@ def get_node_status(node_id):
                 return jsonify({"error": "You don't have permission to view this node"}), 403
         
         from app.models import SensorReading, Alert, PumpCommand
-        from sqlalchemy import desc
+        from sqlalchemy import desc # type: ignore
         
         latest_reading = SensorReading.query.filter_by(node_id=node_id)\
                                            .order_by(desc(SensorReading.recorded_at)).first()
@@ -318,6 +318,14 @@ def select_node():
         if not node:
             return jsonify({"error": "Node not found"}), 404
         
+        # ✅ CRITICAL FIX: Update the node's user_id to the farmer
+        # This ensures the dashboard can find this node
+        original_user_id = node.user_id
+        if node.user_id != current_user_id:
+            node.user_id = current_user_id
+            db.session.commit()
+            print(f"✅ Updated node {node_id} user_id from {original_user_id} to {current_user_id}")
+        
         # Check if already selected
         existing = FarmerNode.query.filter_by(
             farmer_id=current_user_id, 
@@ -346,6 +354,8 @@ def select_node():
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error in select_node: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
