@@ -56,8 +56,8 @@ const Dashboard: React.FC = () => {
   const isExtensionOfficer = user?.role === 'extension_officer' || user?.role === 'admin';
   const isFarmer = user?.role === 'farmer';
 
-  // Save favorites to localStorage
-  useEffect(() => {
+  // Load initial node
+useEffect(() => {
   const loadInitialNode = async () => {
     try {
       const response = await nodeService.getAll();
@@ -94,7 +94,6 @@ const Dashboard: React.FC = () => {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
-
   // Format time in Uganda local time (UTC+3)
   const formatLocalTime = (dateString: string) => {
     const date = new Date(dateString);
