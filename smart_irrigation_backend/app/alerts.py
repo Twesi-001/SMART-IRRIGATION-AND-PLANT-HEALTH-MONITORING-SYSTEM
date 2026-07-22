@@ -2,7 +2,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify # type: ignore
 from flask_jwt_extended import jwt_required, get_jwt_identity # type: ignore
 from app.extensions import db
-from app.models import Alert, SensorNode, User
+from app.models import Alert, SensorNode, User, FarmerNode
 from app.device_auth import require_device_key
 
 alerts_bp = Blueprint("alerts", __name__, url_prefix="/api/alerts")
@@ -62,9 +62,24 @@ def resolve_alert(alert_id):
 @jwt_required()
 def get_alert(alert_id):
     """Get a specific alert by ID"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
     alert = Alert.query.get(alert_id)
     if not alert:
         return jsonify({"error": "alert not found"}), 404
+    
+    # ✅ Check permission for farmers
+    if user.role == 'farmer':
+        # Check if farmer owns the node
+        farmer_node = FarmerNode.query.filter_by(
+            farmer_id=current_user_id,
+            node_id=alert.node_id
+        ).first()
+        node = SensorNode.query.get(alert.node_id)
+        if not farmer_node and (not node or node.user_id != current_user_id):
+            return jsonify({"error": "You don't have permission to view this alert"}), 403
+    
     return jsonify(alert.to_dict()), 200
 
 
@@ -72,9 +87,22 @@ def get_alert(alert_id):
 @jwt_required()
 def delete_alert(alert_id):
     """Delete an alert (permanent removal)"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
     alert = Alert.query.get(alert_id)
     if not alert:
         return jsonify({"error": "alert not found"}), 404
+    
+    # ✅ Check permission for farmers
+    if user.role == 'farmer':
+        farmer_node = FarmerNode.query.filter_by(
+            farmer_id=current_user_id,
+            node_id=alert.node_id
+        ).first()
+        node = SensorNode.query.get(alert.node_id)
+        if not farmer_node and (not node or node.user_id != current_user_id):
+            return jsonify({"error": "You don't have permission to delete this alert"}), 403
     
     db.session.delete(alert)
     db.session.commit()
@@ -85,10 +113,23 @@ def delete_alert(alert_id):
 @jwt_required()
 def resolve_all_alerts():
     """Resolve all alerts for a node"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
     node_id = request.args.get("node_id", 1, type=int)
     
     if not SensorNode.query.get(node_id):
         return jsonify({"error": f"node_id {node_id} does not exist"}), 404
+    
+    # ✅ Check permission for farmers
+    if user.role == 'farmer':
+        farmer_node = FarmerNode.query.filter_by(
+            farmer_id=current_user_id,
+            node_id=node_id
+        ).first()
+        node = SensorNode.query.get(node_id)
+        if not farmer_node and (not node or node.user_id != current_user_id):
+            return jsonify({"error": "You don't have permission to resolve alerts for this node"}), 403
     
     alerts = Alert.query.filter_by(node_id=node_id, resolved=False).all()
     count = len(alerts)
@@ -108,29 +149,96 @@ def resolve_all_alerts():
 @alerts_bp.route("/unresolved", methods=["GET"])
 @jwt_required()
 def get_unresolved_alerts():
-    """Get all unresolved alerts (across all nodes)"""
+    """Get all unresolved alerts for the current user's nodes"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
     node_id = request.args.get("node_id", type=int)
     
-    query = Alert.query.filter_by(resolved=False)
-    if node_id:
-        query = query.filter_by(node_id=node_id)
+    # ✅ For farmers, only show alerts for their nodes
+    if user.role == 'farmer':
+        # Get all nodes this farmer has access to
+        farmer_nodes = FarmerNode.query.filter_by(farmer_id=current_user_id).all()
+        farmer_node_ids = [fn.node_id for fn in farmer_nodes]
+        
+        # Also check direct ownership
+        direct_nodes = SensorNode.query.filter_by(user_id=current_user_id).all()
+        direct_node_ids = [n.id for n in direct_nodes]
+        
+        allowed_node_ids = list(set(farmer_node_ids + direct_node_ids))
+        
+        if not allowed_node_ids:
+            return jsonify([]), 200
+        
+        query = Alert.query.filter_by(resolved=False)
+        if node_id:
+            if node_id not in allowed_node_ids:
+                return jsonify({"error": "You don't have permission to view alerts for this node"}), 403
+            query = query.filter_by(node_id=node_id)
+        else:
+            query = query.filter(Alert.node_id.in_(allowed_node_ids))
+        
+        alerts = query.order_by(Alert.created_at.desc()).all()
+        return jsonify([a.to_dict() for a in alerts]), 200
     
-    alerts = query.order_by(Alert.created_at.desc()).all()
-    return jsonify([a.to_dict() for a in alerts]), 200
+    else:
+        # Admins and extension officers see all alerts
+        query = Alert.query.filter_by(resolved=False)
+        if node_id:
+            query = query.filter_by(node_id=node_id)
+        alerts = query.order_by(Alert.created_at.desc()).all()
+        return jsonify([a.to_dict() for a in alerts]), 200
 
 
 @alerts_bp.route("/summary", methods=["GET"])
 @jwt_required()
 def get_alerts_summary():
-    """Get summary of alerts (counts by node)"""
+    """Get summary of alerts for the current user's nodes"""
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
     from sqlalchemy import func # type: ignore
     
-    summary = db.session.query(
-        Alert.node_id,
-        func.count(Alert.id).label('unresolved_count')
-    ).filter_by(resolved=False).group_by(Alert.node_id).all()
-    
-    total_unresolved = Alert.query.filter_by(resolved=False).count()
+    # ✅ For farmers, only count alerts for their nodes
+    if user.role == 'farmer':
+        farmer_nodes = FarmerNode.query.filter_by(farmer_id=current_user_id).all()
+        farmer_node_ids = [fn.node_id for fn in farmer_nodes]
+        
+        direct_nodes = SensorNode.query.filter_by(user_id=current_user_id).all()
+        direct_node_ids = [n.id for n in direct_nodes]
+        
+        allowed_node_ids = list(set(farmer_node_ids + direct_node_ids))
+        
+        if not allowed_node_ids:
+            return jsonify({'total_unresolved': 0, 'by_node': []}), 200
+        
+        summary = db.session.query(
+            Alert.node_id,
+            func.count(Alert.id).label('unresolved_count')
+        ).filter(
+            Alert.resolved == False,
+            Alert.node_id.in_(allowed_node_ids)
+        ).group_by(Alert.node_id).all()
+        
+        total_unresolved = Alert.query.filter(
+            Alert.resolved == False,
+            Alert.node_id.in_(allowed_node_ids)
+        ).count()
+        
+    else:
+        # Admins and extension officers see all alerts
+        summary = db.session.query(
+            Alert.node_id,
+            func.count(Alert.id).label('unresolved_count')
+        ).filter_by(resolved=False).group_by(Alert.node_id).all()
+        
+        total_unresolved = Alert.query.filter_by(resolved=False).count()
     
     return jsonify({
         'total_unresolved': total_unresolved,
