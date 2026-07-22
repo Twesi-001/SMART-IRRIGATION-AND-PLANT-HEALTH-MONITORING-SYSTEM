@@ -144,3 +144,37 @@ class Alert(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
         }
+    # ===== NEW: Farmer-Node Association Table =====
+# Add this at the very bottom of models.py, after the Alert class
+
+class FarmerNode(db.Model):
+    """Association between farmers and the nodes/crops they grow"""
+    __tablename__ = 'farmer_nodes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    farmer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    node_id = db.Column(db.Integer, db.ForeignKey('sensor_nodes.id'), nullable=False)
+    
+    # Farmer-specific info for this crop
+    custom_name = db.Column(db.String(100))
+    location = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    farmer = db.relationship('User', backref='farmer_crops')
+    node = db.relationship('SensorNode', backref='farmer_crops')
+    
+    # Ensure a farmer can only select a crop once
+    __table_args__ = (db.UniqueConstraint('farmer_id', 'node_id', name='unique_farmer_crop'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'farmer_id': self.farmer_id,
+            'node_id': self.node_id,
+            'node_name': self.node.node_name if self.node else None,
+            'crop_type': self.node.crop_type if self.node else None,
+            'custom_name': self.custom_name,
+            'location': self.location,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

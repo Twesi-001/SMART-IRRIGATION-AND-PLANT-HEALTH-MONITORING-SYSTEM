@@ -12,6 +12,11 @@ API_KEY = "PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g"
 SERIAL_PORT = "COM4"  # ← CHANGE THIS TO YOUR PORT
 BAUD_RATE = 9600
 
+# ===== NODE CACHE (Auto-Discovery) =====
+NODE_IDS = []
+LAST_FETCH_TIME = 0
+FETCH_INTERVAL = 60  # Check for new nodes every 60 seconds
+
 # ===== AUTH CREDENTIALS (kept as backup) =====
 AUTH_USERNAME = "testuser"
 AUTH_PASSWORD = "test123"
@@ -49,7 +54,7 @@ def get_all_node_ids_with_token():
         get_token()
     
     if not TOKEN:
-        return list(range(1, 41))
+        return list(range(1, 21))
     
     try:
         response = requests.get(
@@ -62,32 +67,42 @@ def get_all_node_ids_with_token():
             return [node['id'] for node in nodes]
     except:
         pass
-    return list(range(1, 41))
+    return list(range(1, 21))
 
-# ===== CHANGED FUNCTION =====
-def get_all_node_ids():
+def fetch_all_nodes():
     """Fetch ALL node IDs using API key (bypasses user filtering)"""
+    global NODE_IDS, LAST_FETCH_TIME
+    
     try:
-        # 🔑 Use API key - sees ALL nodes regardless of owner
         response = requests.get(
             "https://smart-irrigation-and-plant-health.onrender.com/api/nodes",
-            headers={"X-API-Key": API_KEY},  # ← KEY CHANGE
+            headers={"X-API-Key": API_KEY},
             timeout=10
         )
         if response.status_code == 200:
             nodes = response.json()
-            node_ids = [node['id'] for node in nodes]
-            print(f"📡 Found {len(node_ids)} nodes in database")
-            print(f"📡 Node IDs: {node_ids}")  # Show all node IDs
-            return node_ids
+            NODE_IDS = [node['id'] for node in nodes]
+            LAST_FETCH_TIME = time.time()
+            print(f"📡 Found {len(NODE_IDS)} nodes in database")
+            print(f"📡 Node IDs: {NODE_IDS}")
+            return NODE_IDS
         else:
             print(f"⚠️ Could not fetch nodes with API key: {response.status_code}")
-            print(f"⚠️ Falling back to token method...")
             return get_all_node_ids_with_token()
     except Exception as e:
         print(f"⚠️ Error fetching nodes: {e}")
-        print(f"⚠️ Falling back to token method...")
         return get_all_node_ids_with_token()
+
+def get_all_node_ids():
+    """Get all node IDs, refreshing cache if needed"""
+    global NODE_IDS, LAST_FETCH_TIME
+    
+    # If we haven't fetched yet, or it's been more than FETCH_INTERVAL seconds
+    if not NODE_IDS or (time.time() - LAST_FETCH_TIME) > FETCH_INTERVAL:
+        print("🔄 Refreshing node list...")
+        return fetch_all_nodes()
+    
+    return NODE_IDS
 
 def send_reading(moisture, temp, humidity, node_id):
     """Send sensor reading to the API for a specific node"""
@@ -108,10 +123,13 @@ def send_reading(moisture, temp, humidity, node_id):
         
         if response.status_code == 201:
             print(f"   ✅ Node {node_id}: Soil={data['soil_moisture']}%, Temp={data['temperature']}°C, Hum={data['humidity']}%")
+            return True
         else:
             print(f"   ❌ Node {node_id}: {response.status_code}")
+            return False
     except Exception as e:
         print(f"   ❌ Node {node_id}: Connection error")
+        return False
 
 def extract_values_from_lines(lines):
     """Extract moisture, temp, humidity from a list of lines"""
@@ -138,7 +156,7 @@ def extract_values_from_lines(lines):
 
 def send_to_all_nodes(moisture, temp, humidity):
     """Send the same reading to ALL nodes in the database"""
-    # Get ALL nodes from the database
+    # Get ALL nodes (auto-refreshes every 60 seconds)
     node_ids = get_all_node_ids()
     
     if not node_ids:
@@ -164,35 +182,32 @@ def send_to_all_nodes(moisture, temp, humidity):
     print(f"✅ Done! All {len(node_ids)} nodes updated.")
 
 def main():
-    print("🌱 Smart Irrigation Data Ingest")
-    print("================================")
+    print("🌱 Smart Irrigation Data Ingest (Auto-Discovery Mode)")
+    print("=" * 50)
     print(f"📡 Connecting to {SERIAL_PORT} at {BAUD_RATE} baud...")
-    print("-" * 40)
+    print("🔄 Will auto-discover new nodes every 60 seconds")
+    print("-" * 50)
     
-    # Test API key access first
-    print("🔑 Testing API key access...")
-    test_nodes = get_all_node_ids()
-    if test_nodes:
-        print(f"✅ API key working! Found {len(test_nodes)} nodes")
-    else:
-        print("⚠️ API key failed, trying token...")
-        get_token()
-        if not TOKEN:
-            print("❌ Failed to get token. Please check credentials.")
-            return
+    # Initial fetch of all nodes
+    print("🔑 Fetching all nodes from database...")
+    fetch_all_nodes()
+    
+    if not NODE_IDS:
+        print("⚠️ No nodes found! Will keep checking...")
     
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-        print("✅ Connected!")
+        print("✅ Connected to Arduino!")
         time.sleep(2)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error connecting to serial port: {e}")
         return
     
     print("📊 Waiting for sensor data... Press Ctrl+C to stop")
-    print("=" * 40)
+    print("=" * 50)
     
     buffer = []
+    reading_count = 0
     
     while True:
         try:
@@ -204,6 +219,13 @@ def main():
                 if "SENSOR READINGS" in line:
                     data = extract_values_from_lines(buffer)
                     if data:
+                        reading_count += 1
+                        print(f"\n📊 Reading #{reading_count}:")
+                        print(f"   💧 Moisture: {data['moisture']}%")
+                        print(f"   🌡️ Temperature: {data['temp']}°C")
+                        print(f"   💨 Humidity: {data['humidity']}%")
+                        
+                        # Send to ALL nodes (auto-discovers new ones)
                         send_to_all_nodes(
                             data['moisture'],
                             data['temp'],
@@ -212,7 +234,10 @@ def main():
                     buffer = []
                     
         except KeyboardInterrupt:
-            print("\n🛑 Stopped by user")
+            print("\n" + "=" * 50)
+            print(f"🛑 Stopped by user")
+            print(f"📊 Total readings sent: {reading_count}")
+            print("=" * 50)
             break
         except Exception as e:
             print(f"❌ Error: {e}")
