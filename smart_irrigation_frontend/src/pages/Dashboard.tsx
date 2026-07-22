@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -58,8 +58,42 @@ const Dashboard: React.FC = () => {
 
   // Save favorites to localStorage
   useEffect(() => {
-    localStorage.setItem('favoriteNodes', JSON.stringify(favorites));
-  }, [favorites]);
+  const loadInitialNode = async () => {
+    try {
+      const response = await nodeService.getAll();
+      const nodes = response.data;
+      setAllNodes(nodes);
+      
+      // Filter nodes for farmers
+      let userNodes = nodes;
+      if (user?.role === 'farmer') {
+        userNodes = nodes.filter((n) => n.user_id === user.id);
+      }
+      
+      if (userNodes.length === 0) {
+        setLoading(false);
+        setSelectedNodeId(null);
+        return;
+      }
+      
+      const favoriteNode = userNodes.find((n) => favorites.includes(n.id));
+      const initialNode = favoriteNode || userNodes[0];
+      setSelectedNodeId(initialNode.id);
+      await fetchData(initialNode.id);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading initial node:', error);
+      setLoading(false);
+    }
+  };
+  
+  loadInitialNode();
+  
+  if (isExtensionOfficer) {
+    fetchFarmers();
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   // Format time in Uganda local time (UTC+3)
   const formatLocalTime = (dateString: string) => {
@@ -298,20 +332,26 @@ const Dashboard: React.FC = () => {
 
   // Load initial node
   useEffect(() => {
-    const loadInitialNode = async () => {
+ const loadInitialNode = async () => {
   try {
     const response = await nodeService.getAll();
     const nodes = response.data;
     setAllNodes(nodes);
     
-    if (nodes.length === 0) {
+    // Filter nodes that belong to the current user (for farmers)
+    let userNodes = nodes;
+    if (user?.role === 'farmer') {
+      userNodes = nodes.filter((n) => n.user_id === user.id);
+    }
+    
+    if (userNodes.length === 0) {
       setLoading(false);
-      setSelectedNodeId(null);  // ← Show empty state
+      setSelectedNodeId(null);
       return;
     }
     
-    const favoriteNode = nodes.find((n) => favorites.includes(n.id));
-    const initialNode = favoriteNode || nodes[0];
+    const favoriteNode = userNodes.find((n) => favorites.includes(n.id));
+    const initialNode = favoriteNode || userNodes[0];
     setSelectedNodeId(initialNode.id);
     await fetchData(initialNode.id);
     setLoading(false);
