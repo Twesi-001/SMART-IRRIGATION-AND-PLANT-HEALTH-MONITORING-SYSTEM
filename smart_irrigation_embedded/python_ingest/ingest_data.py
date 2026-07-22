@@ -12,35 +12,40 @@ API_KEY = "PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g"
 SERIAL_PORT = "COM4"  # ← CHANGE THIS TO YOUR PORT
 BAUD_RATE = 9600
 
-# ===== ALL NODE IDs =====
-# These are the 20 crops your ML model was trained on
-ALL_NODE_IDS = list(range(1, 21))  # 1 to 20
-
-# Crop names for display
-CROP_NAMES = {
-    1: "Maize",
-    2: "Tomato",
-    3: "Onion",
-    4: "Cabbage",
-    5: "Mango",
-    6: "Banana",
-    7: "Pineapple",
-    8: "Passion Fruit",
-    9: "Carrot",
-    10: "Capsicum",
-    11: "Eggplant",
-    12: "Sukuma Wiki",
-    13: "Spinach",
-    14: "Beans",
-    15: "Garlic",
-    16: "Strawberry",
-    17: "Lettuce",
-    18: "Cucumber",
-    19: "Watermelon",
-    20: "Pumpkin"
-}
-
 # ===== FUNCTIONS =====
+
+def get_all_node_ids():
+    """Fetch ALL node IDs from the database dynamically"""
+    try:
+        response = requests.get(
+            "https://smart-irrigation-and-plant-health.onrender.com/api/nodes",
+            timeout=10
+        )
+        if response.status_code == 200:
+            nodes = response.json()
+            node_ids = [node['id'] for node in nodes]
+            print(f"📡 Found {len(node_ids)} nodes in database")
+            return node_ids
+        else:
+            print(f"⚠️ Could not fetch nodes: {response.status_code}")
+            return list(range(1, 21))
+    except Exception as e:
+        print(f"⚠️ Error fetching nodes: {e}")
+        return list(range(1, 21))
+
+def get_crop_name(node_id):
+    """Get crop name for a node (optional, for display)"""
+    try:
+        response = requests.get(
+            f"https://smart-irrigation-and-plant-health.onrender.com/api/nodes/{node_id}",
+            timeout=5
+        )
+        if response.status_code == 200:
+            node = response.json()
+            return node.get('crop_type', f"Node-{node_id}")
+    except:
+        pass
+    return f"Node-{node_id}"
 
 def send_reading(moisture, temp, humidity, node_id):
     """Send sensor reading to the API for a specific node"""
@@ -60,7 +65,8 @@ def send_reading(moisture, temp, humidity, node_id):
         )
         
         if response.status_code == 201:
-            crop = CROP_NAMES.get(node_id, f"Node-{node_id}")
+            # Optional: get crop name for display
+            crop = get_crop_name(node_id)
             print(f"   ✅ {crop} (Node {node_id}): Soil={data['soil_moisture']}%, Temp={data['temperature']}°C, Hum={data['humidity']}%")
         else:
             print(f"   ❌ Node {node_id}: {response.status_code}")
@@ -91,12 +97,19 @@ def extract_values_from_lines(lines):
     return None
 
 def send_to_all_nodes(moisture, temp, humidity):
-    """Send the same reading to ALL nodes"""
-    print(f"\n📤 Sending to ALL {len(ALL_NODE_IDS)} nodes...")
+    """Send the same reading to ALL nodes in the database"""
+    # Get ALL nodes from the database
+    node_ids = get_all_node_ids()
+    
+    if not node_ids:
+        print("⚠️ No nodes found!")
+        return
+    
+    print(f"\n📤 Sending to ALL {len(node_ids)} nodes...")
     
     # Use threading for faster sending
     threads = []
-    for node_id in ALL_NODE_IDS:
+    for node_id in node_ids:
         thread = threading.Thread(
             target=send_reading,
             args=(moisture, temp, humidity, node_id)
@@ -108,13 +121,12 @@ def send_to_all_nodes(moisture, temp, humidity):
     for thread in threads:
         thread.join()
     
-    print(f"✅ Done! All {len(ALL_NODE_IDS)} nodes updated.")
+    print(f"✅ Done! All {len(node_ids)} nodes updated.")
 
 def main():
     print("🌱 Smart Irrigation Data Ingest")
     print("================================")
     print(f"📡 Connecting to {SERIAL_PORT} at {BAUD_RATE} baud...")
-    print(f"📤 Will send data to ALL {len(ALL_NODE_IDS)} nodes")
     print("-" * 40)
     
     try:
@@ -129,7 +141,6 @@ def main():
     print("=" * 40)
     
     buffer = []
-    last_sent = 0
     
     while True:
         try:
@@ -157,5 +168,4 @@ def main():
         time.sleep(0.1)
 
 if __name__ == "__main__":
-    print(f"📡 Sending to nodes: {ALL_NODE_IDS}")
     main()
