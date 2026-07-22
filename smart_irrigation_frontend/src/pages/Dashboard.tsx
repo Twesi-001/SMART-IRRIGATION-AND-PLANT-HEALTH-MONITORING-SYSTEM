@@ -209,7 +209,7 @@ const Dashboard: React.FC = () => {
         setNodeName('');
 
         // ✅ Simple reload - avoids all routing issues
-        window.location.reload();
+        window.location.href = '/';
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to select garden');
