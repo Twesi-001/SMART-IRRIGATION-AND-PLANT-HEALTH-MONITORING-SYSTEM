@@ -39,7 +39,7 @@ class SensorNode(db.Model):
     moisture_threshold = db.Column(db.Numeric(5, 2), default=30.00)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)  # ← ADD THIS
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
     readings = db.relationship("SensorReading", backref="node", cascade="all, delete-orphan")
 
@@ -126,6 +126,7 @@ class Alert(db.Model):
 
     id = db.Column(db.BigInteger().with_variant(db.Integer, "sqlite"), primary_key=True)
     node_id = db.Column(db.Integer, db.ForeignKey("sensor_nodes.id"), nullable=False)
+    farmer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)  # ✅ ADDED
     alert_type = db.Column(db.String(60), nullable=False)
     message = db.Column(db.String(255), nullable=False)
     severity = db.Column(db.Enum("INFO", "WARNING", "CRITICAL"), default="WARNING")
@@ -133,10 +134,14 @@ class Alert(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     resolved_at = db.Column(db.DateTime, nullable=True)
 
+    # ✅ Relationship to User (farmer)
+    farmer = db.relationship("User", backref="alerts")
+
     def to_dict(self):
         return {
             "id": self.id,
             "node_id": self.node_id,
+            "farmer_id": self.farmer_id,  # ✅ ADDED
             "alert_type": self.alert_type,
             "message": self.message,
             "severity": self.severity,
@@ -144,8 +149,7 @@ class Alert(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
         }
-    # ===== NEW: Farmer-Node Association Table =====
-# Add this at the very bottom of models.py, after the Alert class
+
 
 class FarmerNode(db.Model):
     """Association between farmers and the nodes/crops they grow"""
