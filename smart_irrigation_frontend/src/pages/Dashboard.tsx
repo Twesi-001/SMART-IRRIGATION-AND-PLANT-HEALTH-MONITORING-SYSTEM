@@ -75,20 +75,12 @@ const Dashboard: React.FC = () => {
         console.log('👤 Current user:', user);
         console.log('🆔 User ID:', user?.id);
 
-        // ✅ For farmers, check which nodes they have access to
+        // ✅ For farmers, the API already filters by FarmerNode
+        // So all returned nodes belong to this farmer
         let userNodes = [];
         if (user?.role === 'farmer') {
-          // The API already filters by FarmerNode, so all returned nodes belong to this farmer
-          // But we also check user_id as a fallback
-          userNodes = nodes.filter((n) => {
-            // Check if node belongs to this farmer via FarmerNode (API already filters)
-            // OR check if user_id matches
-            return n.user_id === user.id || true;
-          });
-          // If filtering by user_id returns nothing, use all nodes (API already filtered)
-          if (userNodes.length === 0 && nodes.length > 0) {
-            userNodes = nodes;
-          }
+          // The API already does the filtering, just use all nodes
+          userNodes = nodes;
         } else {
           userNodes = nodes;
         }
@@ -393,20 +385,11 @@ const Dashboard: React.FC = () => {
         console.log('👤 Current user:', user);
         console.log('🆔 User ID:', user?.id);
 
-        // ✅ For farmers, check which nodes they have access to
+        // ✅ For farmers, the API already filters by FarmerNode
+        // So all returned nodes belong to this farmer
         let userNodes = [];
         if (user?.role === 'farmer') {
-          // The API already filters by FarmerNode, so all returned nodes belong to this farmer
-          // But we also check user_id as a fallback
-          userNodes = nodes.filter((n) => {
-            // Check if node belongs to this farmer via FarmerNode (API already filters)
-            // OR check if user_id matches
-            return n.user_id === user.id || true;
-          });
-          // If filtering by user_id returns nothing, use all nodes (API already filtered)
-          if (userNodes.length === 0 && nodes.length > 0) {
-            userNodes = nodes;
-          }
+          userNodes = nodes;
         } else {
           userNodes = nodes;
         }
