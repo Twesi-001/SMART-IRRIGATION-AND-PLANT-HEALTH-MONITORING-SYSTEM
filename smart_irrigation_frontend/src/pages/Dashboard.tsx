@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/immutability */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService, readingsService, pumpService, alertService, nodeService } from '../services/api';
 import { DashboardSummary, SensorReading, Alert, SensorNode } from '../types';
@@ -27,6 +28,7 @@ interface Farmer {
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
@@ -154,7 +156,7 @@ useEffect(() => {
     }
   };
 
-  async function createNode({ nodeName, cropType }: { nodeName: string; cropType: string; _threshold: number; }): Promise<void> {
+  async function createNode(nodeName: string, cropType: string, _threshold: number): Promise<void> {
     try {
       const token = localStorage.getItem('token');
 
@@ -188,7 +190,7 @@ useEffect(() => {
 
       if (response.ok) {
         toast.success('Garden selected successfully!');
-        window.location.reload();
+        navigate('/dashboard');
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to select garden');
@@ -421,7 +423,7 @@ useEffect(() => {
           <form onSubmit={async (e) => {
             e.preventDefault();
             if (nodeName.trim() && cropType) {
-              await createNode({ nodeName: nodeName.trim(), cropType, _threshold: cropThresholds[cropType] });
+              await createNode(nodeName.trim(), cropType, cropThresholds[cropType]);
             }
           }}>
             <div className="mb-3">
@@ -536,7 +538,7 @@ useEffect(() => {
           <form onSubmit={async (e) => {
             e.preventDefault();
             if (nodeName.trim() && cropType) {
-              await createNode({ nodeName: nodeName.trim(), cropType, _threshold: cropThresholds[cropType] });
+              await createNode(nodeName.trim(), cropType, cropThresholds[cropType]);
             }
           }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
