@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify # type: ignore
 from flask_jwt_extended import create_access_token # type: ignore
 from app.extensions import db
-from app.models import User, SensorNode, FarmerNode  # ✅ ADDED SensorNode, FarmerNode
+from app.models import User, SensorNode, FarmerNode
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -28,7 +28,7 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    # ✅ AUTO-ASSIGN ALL NODES TO NEW FARMERS
+    # ✅ AUTO-ASSIGN ALL 20 NODES TO NEW FARMERS
     if user.role == 'farmer':
         all_nodes = SensorNode.query.all()
         for node in all_nodes:

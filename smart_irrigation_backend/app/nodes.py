@@ -17,22 +17,24 @@ def list_nodes():
             return jsonify({"error": "User not found"}), 404
         
         if user.role == 'farmer':
-            # ✅ Check BOTH FarmerNode AND SensorNode
-            # 1. Get nodes from FarmerNode (new farmers who selected crops)
+            # ✅ Get nodes from FarmerNode (selected crops)
             farmer_nodes = FarmerNode.query.filter_by(farmer_id=current_user_id).all()
             farmer_node_ids = [fn.node_id for fn in farmer_nodes]
             
-            # 2. Get nodes from SensorNode (old farmers who created nodes)
+            # ✅ If farmer has NO selections, return empty (show empty state)
+            if not farmer_node_ids:
+                print(f"👨‍🌾 Farmer {current_user_id}: No selections yet - showing empty state")
+                return jsonify([]), 200
+            
+            # ✅ Also check direct ownership
             direct_nodes = SensorNode.query.filter_by(user_id=current_user_id).all()
             direct_node_ids = [n.id for n in direct_nodes]
             
-            # 3. Combine both lists (remove duplicates)
             all_node_ids = list(set(farmer_node_ids + direct_node_ids))
             
             if all_node_ids:
                 nodes = SensorNode.query.filter(SensorNode.id.in_(all_node_ids)).all()
             else:
-                # No crops selected yet
                 nodes = []
                 
             print(f"✅ Farmer {current_user_id}: Found {len(nodes)} nodes")
@@ -318,8 +320,7 @@ def select_node():
         if not node:
             return jsonify({"error": "Node not found"}), 404
         
-        # ✅ CRITICAL FIX: Update the node's user_id to the farmer
-        # This ensures the dashboard can find this node
+        # ✅ Update the node's user_id to the farmer
         original_user_id = node.user_id
         if node.user_id != current_user_id:
             node.user_id = current_user_id
