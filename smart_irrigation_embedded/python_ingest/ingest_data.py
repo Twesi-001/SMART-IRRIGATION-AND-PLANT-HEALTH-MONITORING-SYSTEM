@@ -12,13 +12,51 @@ API_KEY = "PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g"
 SERIAL_PORT = "COM4"  # ← CHANGE THIS TO YOUR PORT
 BAUD_RATE = 9600
 
+# ===== AUTH CREDENTIALS =====
+AUTH_USERNAME = "testuser"  # ← Change to a valid user
+AUTH_PASSWORD = "test123"
+
+# ===== TOKEN (will be fetched automatically) =====
+TOKEN = None
+
 # ===== FUNCTIONS =====
 
+def get_token():
+    """Login and get a fresh token"""
+    global TOKEN
+    try:
+        response = requests.post(
+            "https://smart-irrigation-and-plant-health.onrender.com/api/auth/login",
+            json={"username": AUTH_USERNAME, "password": AUTH_PASSWORD},
+            timeout=10
+        )
+        if response.status_code == 200:
+            TOKEN = response.json().get("access_token")
+            print(f"✅ Token obtained successfully!")
+            return TOKEN
+        else:
+            print(f"⚠️ Failed to get token: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"⚠️ Error getting token: {e}")
+        return None
+
 def get_all_node_ids():
-    """Fetch ALL node IDs from the database dynamically"""
+    """Fetch ALL node IDs from the database with authentication"""
+    global TOKEN
+    
+    # If no token, get one
+    if not TOKEN:
+        get_token()
+    
+    if not TOKEN:
+        print("⚠️ No token available! Using default nodes.")
+        return list(range(1, 21))
+    
     try:
         response = requests.get(
             "https://smart-irrigation-and-plant-health.onrender.com/api/nodes",
+            headers={"Authorization": f"Bearer {TOKEN}"},
             timeout=10
         )
         if response.status_code == 200:
@@ -26,26 +64,29 @@ def get_all_node_ids():
             node_ids = [node['id'] for node in nodes]
             print(f"📡 Found {len(node_ids)} nodes in database")
             return node_ids
+        elif response.status_code == 401:
+            # Token expired, try to refresh
+            print("⚠️ Token expired. Getting new token...")
+            get_token()
+            if TOKEN:
+                # Retry with new token
+                response = requests.get(
+                    "https://smart-irrigation-and-plant-health.onrender.com/api/nodes",
+                    headers={"Authorization": f"Bearer {TOKEN}"},
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    nodes = response.json()
+                    node_ids = [node['id'] for node in nodes]
+                    print(f"📡 Found {len(node_ids)} nodes in database")
+                    return node_ids
+            return list(range(1, 21))
         else:
             print(f"⚠️ Could not fetch nodes: {response.status_code}")
             return list(range(1, 21))
     except Exception as e:
         print(f"⚠️ Error fetching nodes: {e}")
         return list(range(1, 21))
-
-def get_crop_name(node_id):
-    """Get crop name for a node (optional, for display)"""
-    try:
-        response = requests.get(
-            f"https://smart-irrigation-and-plant-health.onrender.com/api/nodes/{node_id}",
-            timeout=5
-        )
-        if response.status_code == 200:
-            node = response.json()
-            return node.get('crop_type', f"Node-{node_id}")
-    except:
-        pass
-    return f"Node-{node_id}"
 
 def send_reading(moisture, temp, humidity, node_id):
     """Send sensor reading to the API for a specific node"""
@@ -65,9 +106,7 @@ def send_reading(moisture, temp, humidity, node_id):
         )
         
         if response.status_code == 201:
-            # Optional: get crop name for display
-            crop = get_crop_name(node_id)
-            print(f"   ✅ {crop} (Node {node_id}): Soil={data['soil_moisture']}%, Temp={data['temperature']}°C, Hum={data['humidity']}%")
+            print(f"   ✅ Node {node_id}: Soil={data['soil_moisture']}%, Temp={data['temperature']}°C, Hum={data['humidity']}%")
         else:
             print(f"   ❌ Node {node_id}: {response.status_code}")
     except Exception as e:
@@ -98,7 +137,7 @@ def extract_values_from_lines(lines):
 
 def send_to_all_nodes(moisture, temp, humidity):
     """Send the same reading to ALL nodes in the database"""
-    # Get ALL nodes from the database
+    # Get ALL nodes from the database with auth
     node_ids = get_all_node_ids()
     
     if not node_ids:
@@ -128,6 +167,14 @@ def main():
     print("================================")
     print(f"📡 Connecting to {SERIAL_PORT} at {BAUD_RATE} baud...")
     print("-" * 40)
+    
+    # Get initial token
+    print("🔑 Getting authentication token...")
+    get_token()
+    
+    if not TOKEN:
+        print("❌ Failed to get token. Please check credentials.")
+        return
     
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
