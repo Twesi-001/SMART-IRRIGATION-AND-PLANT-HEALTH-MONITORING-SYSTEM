@@ -12,11 +12,11 @@ API_KEY = "PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g"
 SERIAL_PORT = "COM4"  # ← CHANGE THIS TO YOUR PORT
 BAUD_RATE = 9600
 
-# ===== AUTH CREDENTIALS =====
-AUTH_USERNAME = "testuser"  # ← Change to a valid user
+# ===== AUTH CREDENTIALS (kept as backup) =====
+AUTH_USERNAME = "testuser"
 AUTH_PASSWORD = "test123"
 
-# ===== TOKEN (will be fetched automatically) =====
+# ===== TOKEN (kept as backup) =====
 TOKEN = None
 
 # ===== FUNCTIONS =====
@@ -41,17 +41,15 @@ def get_token():
         print(f"⚠️ Error getting token: {e}")
         return None
 
-def get_all_node_ids():
-    """Fetch ALL node IDs from the database with authentication"""
+def get_all_node_ids_with_token():
+    """Fallback: Fetch nodes using token"""
     global TOKEN
     
-    # If no token, get one
     if not TOKEN:
         get_token()
     
     if not TOKEN:
-        print("⚠️ No token available! Using default nodes.")
-        return list(range(1, 21))
+        return list(range(1, 41))
     
     try:
         response = requests.get(
@@ -61,32 +59,35 @@ def get_all_node_ids():
         )
         if response.status_code == 200:
             nodes = response.json()
+            return [node['id'] for node in nodes]
+    except:
+        pass
+    return list(range(1, 41))
+
+# ===== CHANGED FUNCTION =====
+def get_all_node_ids():
+    """Fetch ALL node IDs using API key (bypasses user filtering)"""
+    try:
+        # 🔑 Use API key - sees ALL nodes regardless of owner
+        response = requests.get(
+            "https://smart-irrigation-and-plant-health.onrender.com/api/nodes",
+            headers={"X-API-Key": API_KEY},  # ← KEY CHANGE
+            timeout=10
+        )
+        if response.status_code == 200:
+            nodes = response.json()
             node_ids = [node['id'] for node in nodes]
             print(f"📡 Found {len(node_ids)} nodes in database")
+            print(f"📡 Node IDs: {node_ids}")  # Show all node IDs
             return node_ids
-        elif response.status_code == 401:
-            # Token expired, try to refresh
-            print("⚠️ Token expired. Getting new token...")
-            get_token()
-            if TOKEN:
-                # Retry with new token
-                response = requests.get(
-                    "https://smart-irrigation-and-plant-health.onrender.com/api/nodes",
-                    headers={"Authorization": f"Bearer {TOKEN}"},
-                    timeout=10
-                )
-                if response.status_code == 200:
-                    nodes = response.json()
-                    node_ids = [node['id'] for node in nodes]
-                    print(f"📡 Found {len(node_ids)} nodes in database")
-                    return node_ids
-            return list(range(1, 21))
         else:
-            print(f"⚠️ Could not fetch nodes: {response.status_code}")
-            return list(range(1, 21))
+            print(f"⚠️ Could not fetch nodes with API key: {response.status_code}")
+            print(f"⚠️ Falling back to token method...")
+            return get_all_node_ids_with_token()
     except Exception as e:
         print(f"⚠️ Error fetching nodes: {e}")
-        return list(range(1, 21))
+        print(f"⚠️ Falling back to token method...")
+        return get_all_node_ids_with_token()
 
 def send_reading(moisture, temp, humidity, node_id):
     """Send sensor reading to the API for a specific node"""
@@ -137,7 +138,7 @@ def extract_values_from_lines(lines):
 
 def send_to_all_nodes(moisture, temp, humidity):
     """Send the same reading to ALL nodes in the database"""
-    # Get ALL nodes from the database with auth
+    # Get ALL nodes from the database
     node_ids = get_all_node_ids()
     
     if not node_ids:
@@ -168,13 +169,17 @@ def main():
     print(f"📡 Connecting to {SERIAL_PORT} at {BAUD_RATE} baud...")
     print("-" * 40)
     
-    # Get initial token
-    print("🔑 Getting authentication token...")
-    get_token()
-    
-    if not TOKEN:
-        print("❌ Failed to get token. Please check credentials.")
-        return
+    # Test API key access first
+    print("🔑 Testing API key access...")
+    test_nodes = get_all_node_ids()
+    if test_nodes:
+        print(f"✅ API key working! Found {len(test_nodes)} nodes")
+    else:
+        print("⚠️ API key failed, trying token...")
+        get_token()
+        if not TOKEN:
+            print("❌ Failed to get token. Please check credentials.")
+            return
     
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
