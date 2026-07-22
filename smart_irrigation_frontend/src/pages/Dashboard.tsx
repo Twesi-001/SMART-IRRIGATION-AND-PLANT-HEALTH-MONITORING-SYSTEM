@@ -157,13 +157,11 @@ const Dashboard: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
 
-      // Get ALL existing nodes
       const allNodesResponse = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/all', {
         headers: { 'X-API-Key': 'PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g' }
       });
       const allNodes = await allNodesResponse.json();
 
-      // Find the existing node with matching crop type
       const existingNode = allNodes.find((n: { crop_type: string }) => n.crop_type === cropType);
 
       if (!existingNode) {
@@ -171,7 +169,6 @@ const Dashboard: React.FC = () => {
         return;
       }
 
-      // SELECT the existing node
       const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/select', {
         method: 'POST',
         headers: {
@@ -187,13 +184,11 @@ const Dashboard: React.FC = () => {
 
       if (response.ok) {
         toast.success('✅ Garden selected successfully!');
-
-        // ✅ Close the form
         setShowAddGardenForm(false);
         setCropType('');
         setNodeName('');
 
-        // ✅ Refresh the page to show the new garden
+        // ✅ Simple reload - avoids all routing issues
         window.location.reload();
       } else {
         const error = await response.json();
@@ -762,8 +757,8 @@ const Dashboard: React.FC = () => {
                 key={n.id}
                 onClick={() => handleNodeSelect(n.id)}
                 className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${selectedNodeId === n.id
-                    ? 'border-green-500 bg-green-50 shadow-md'
-                    : 'border-gray-200 bg-white hover:border-green-300 hover:shadow'
+                  ? 'border-green-500 bg-green-50 shadow-md'
+                  : 'border-gray-200 bg-white hover:border-green-300 hover:shadow'
                   }`}
               >
                 <div className="text-2xl text-center">{getCropIcon(n.crop_type)}</div>
