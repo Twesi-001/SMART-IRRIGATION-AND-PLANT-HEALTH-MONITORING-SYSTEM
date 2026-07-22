@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify # type: ignore
 from flask_jwt_extended import create_access_token # type: ignore
 from app.extensions import db
-from app.models import User, SensorNode, FarmerNode  # ← ADDED SensorNode, FarmerNode
+from app.models import User
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -28,19 +28,6 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    # ✅ AUTO-ASSIGN ALL NODES TO NEW FARMERS
-    if user.role == 'farmer':
-        all_nodes = SensorNode.query.all()
-        for node in all_nodes:
-            farmer_node = FarmerNode(
-                farmer_id=user.id,
-                node_id=node.id,
-                custom_name=f"{user.username}'s {node.crop_type or 'Garden'}"
-            )
-            db.session.add(farmer_node)
-        db.session.commit()
-        print(f"✅ Assigned {len(all_nodes)} nodes to new farmer: {user.username}")
-
     return jsonify(user.to_dict()), 201
 
 
@@ -62,7 +49,7 @@ def login():
         additional_claims={
             "username": user.username,
             "role": user.role,
-            "user_id": user.id
+            "user_id": user.id  # ← ADDED THIS
         },
     )
     return jsonify({"access_token": access_token, "user": user.to_dict()}), 200
