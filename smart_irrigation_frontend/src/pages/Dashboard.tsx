@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/immutability */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dashboardService, readingsService, pumpService, alertService, nodeService } from '../services/api';
 import { DashboardSummary, SensorReading, Alert, SensorNode } from '../types';
@@ -28,7 +27,6 @@ interface Farmer {
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
   const [readings, setReadings] = useState<SensorReading[]>([]);
@@ -156,51 +154,51 @@ useEffect(() => {
     }
   };
 
-  async function createNode(nodeName: string, cropType: string, _threshold: number): Promise<void> {
-    try {
-      const token = localStorage.getItem('token');
+ async function createNode(nodeName: string, cropType: string, _threshold: number) {
+  try {
+    const token = localStorage.getItem('token');
 
-      // ✅ Step 1: Get ALL existing nodes (1-20)
-      const allNodesResponse = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/all', {
-        headers: { 'X-API-Key': 'PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g' }
-      });
-      const allNodes = await allNodesResponse.json();
+    // ✅ Step 1: Get ALL existing nodes (1-20)
+    const allNodesResponse = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/all', {
+      headers: { 'X-API-Key': 'PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g' }
+    });
+    const allNodes = await allNodesResponse.json();
 
-      // ✅ Step 2: Find the existing node with matching crop type
-      const existingNode = allNodes.find((n: { crop_type: string; }) => n.crop_type === cropType);
+    // ✅ Step 2: Find the existing node with matching crop type
+    const existingNode = allNodes.find((n: { crop_type: string }) => n.crop_type === cropType);
 
-      if (!existingNode) {
-        toast.error(`No node found for crop: ${cropType}`);
-        return;
-      }
-
-      // ✅ Step 3: SELECT the existing node (NOT create new!)
-      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/select', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          node_id: existingNode.id,
-          custom_name: nodeName,
-          location: 'Mbarara, Uganda'
-        })
-      });
-
-      if (response.ok) {
-        toast.success('Garden selected successfully!');
-        navigate('/dashboard');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to select garden');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error selecting garden');
+    if (!existingNode) {
+      toast.error(`No node found for crop: ${cropType}`);
+      return;
     }
-  }
 
+    // ✅ Step 3: SELECT the existing node (NOT create new!)
+    const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/select', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        node_id: existingNode.id,
+        custom_name: nodeName,
+        location: 'Mbarara, Uganda'
+      })
+    });
+
+    if (response.ok) {
+      toast.success('Garden selected successfully!');
+      // ✅ Force a full page reload to the dashboard
+      window.location.href = '/';
+    } else {
+      const error = await response.json();
+      toast.error(error.error || 'Failed to select garden');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    toast.error('Error selecting garden');
+  }
+}
   const fetchData = async (nodeId: number) => {
     try {
       const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
