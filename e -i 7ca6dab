@@ -1,0 +1,69 @@
+[33mfa1db29[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m working on the missing table
+[33m43e9e41[m working on the missing table
+[33m68c0b0e[m solving table creation problem
+[33m7ca6dab[m[33m ([m[1;31morigin/main[m[33m)[m Fix nodes endpoint: show both FarmerNode and SensorNode
+[33m07c79cc[m working more on the nodes
+[33mf14ef1e[m working more on the nodes table
+[33me4fae8a[m sending data to all famers dashbaord
+[33ma0c092b[m adding auto login while fetching data from the database
+[33m4f15b17[m making data to be transferred dynamically across all nodes even the new ones
+[33mf425be4[m loading only nodes for a particular user
+[33me33273f[m loading only nodes for a particular user
+[33m6a33703[m adding in embedded systems part and automatic control pumping
+[33mce223ff[m working on the initialisation state
+[33md134f03[m Fix notification bell to show alerts for logged-in user only
+[33m19b2142[m removing useNavigate import
+[33mba35e1e[m removing unused declaration
+[33m2b851a0[m working on reloading
+[33m6e366c5[m still working on reloading
+[33mb481828[m fixing the reloading issue
+[33m2d46b9f[m creating a room for farmers to add in new gardens at any time based on what was trained on
+[33m5775329[m fixing react_hook syntax
+[33mdc6e384[m adding in new gardens based on the trained data
+[33m14e75f5[m fixing pump toggling based on roles
+[33m5c441a6[m Fix: Preload farmers and refresh alerts after recommendations
+[33m3093acd[m Fix TypeScript build error and deploy frontend
+[33m9503516[m improving on the roles
+[33md34305b[m  working on frontend role based
+[33m79467a2[m Fix alerts.py: add missing decorators and imports
+[33m891a6dd[m working more on the extension_officer role
+[33me0857d2[m Add role-based access control for nodes (Farmer, Extension Officer, Admin)
+[33m78c8c1b[m adding error messages on the login page
+[33maf3af24[m working more on the signup and login
+[33m51980c7[m adding in a favourite system
+[33m082b354[m making the alert popup well responsive on phone
+[33m9645525[m dealing with different nodes
+[33me85c5ac[m making time ugandan local time
+[33m8806e01[m adding AM/PM
+[33me2cb34f[m adjusting time to reflect real ugandan time
+[33mab6458a[m changing time to ugandan time
+[33mb18dc33[m adding a toast for new alert
+[33m023a149[m allowing view alerts to scroll to alerts section
+[33m36c9741[m view alerts button taking to alerts section
+[33m39eccdb[m Add notification bell with alert count
+[33m90af1aa[m Add pandas to requirements.txt
+[33mf350edd[m Fix ML warnings by using DataFrame with feature names
+[33m9c31213[m Use numpy 2.4.6 for Python 3.11 compatibility
+[33m94ea7a7[m Update numpy to 2.5.0 to match local environment
+[33ma3ffff7[m Add debug info to prediction response
+[33maf99717[m working on the api end point
+[33md7a85c0[m Add comprehensive debug for model loading
+[33m317a187[m Add debug prints and multiple model paths
+[33m8488c3a[m Add debug prints and multiple model paths
+[33m1e07b84[m Retrain model with scikit-learn 1.9.0 and joblib 1.4.2
+[33m2850ee9[m Update joblib to 1.4.2 for scikit-learn 1.9.0 compatibility
+[33m03234de[m Update scikit-learn to version 1.9.0 to match local environment
+[33mb8af533[m Add Dockerfile for Render deployment
+[33mdbb5711[m Fix Python version to 3.11 for Render compatibility
+[33mf832dbc[m Fix Python version and dependencies for Render
+[33mb1d13ca[m Add joblib, scikit-learn, numpy for ML model
+[33mfa7b436[m integrating machine learning in the system
+[33maf67361[m working on cors
+[33m24ad0dc[m modified frontend environment
+[33m846ad90[m Fix: Use environment variable for API URL in production
+[33m102f437[m Update CORS for production frontend URL
+[33mcbdbfbe[m adding the production environment
+[33m1f968bf[m adding gunicorn==21.2.0
+[33mbee108c[m renaming requirements.txt
+[33mc3ebb15[m Add Smart Irrigation project - Backend and Frontend
+[33m6bfd43b[m Smart Irrigation and Plant Health Monitoring System
