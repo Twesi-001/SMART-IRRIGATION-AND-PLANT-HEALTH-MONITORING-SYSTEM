@@ -50,50 +50,50 @@ const Dashboard: React.FC = () => {
   const [cropType, setCropType] = useState('');
   const [nodeName, setNodeName] = useState('');
   const [showAddGardenForm, setShowAddGardenForm] = useState(false);
-  
+
   const previousAlertsRef = useRef<Alert[]>([]);
 
   const isExtensionOfficer = user?.role === 'extension_officer' || user?.role === 'admin';
   const isFarmer = user?.role === 'farmer';
 
   // Load initial node
-useEffect(() => {
-  const loadInitialNode = async () => {
-    try {
-      const response = await nodeService.getAll();
-      const nodes = response.data;
-      setAllNodes(nodes);
-      
-      // Filter nodes for farmers
-      let userNodes = nodes;
-      if (user?.role === 'farmer') {
-        userNodes = nodes.filter((n) => n.user_id === user.id);
-      }
-      
-      if (userNodes.length === 0) {
+  useEffect(() => {
+    const loadInitialNode = async () => {
+      try {
+        const response = await nodeService.getAll();
+        const nodes = response.data;
+        setAllNodes(nodes);
+
+        // Filter nodes for farmers
+        let userNodes = nodes;
+        if (user?.role === 'farmer') {
+          userNodes = nodes.filter((n) => n.user_id === user.id);
+        }
+
+        if (userNodes.length === 0) {
+          setLoading(false);
+          setSelectedNodeId(null);
+          return;
+        }
+
+        const favoriteNode = userNodes.find((n) => favorites.includes(n.id));
+        const initialNode = favoriteNode || userNodes[0];
+        setSelectedNodeId(initialNode.id);
+        await fetchData(initialNode.id);
         setLoading(false);
-        setSelectedNodeId(null);
-        return;
+      } catch (error) {
+        console.error('Error loading initial node:', error);
+        setLoading(false);
       }
-      
-      const favoriteNode = userNodes.find((n) => favorites.includes(n.id));
-      const initialNode = favoriteNode || userNodes[0];
-      setSelectedNodeId(initialNode.id);
-      await fetchData(initialNode.id);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading initial node:', error);
-      setLoading(false);
+    };
+
+    loadInitialNode();
+
+    if (isExtensionOfficer) {
+      fetchFarmers();
     }
-  };
-  
-  loadInitialNode();
-  
-  if (isExtensionOfficer) {
-    fetchFarmers();
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Format time in Uganda local time (UTC+3)
   const formatLocalTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -153,52 +153,57 @@ useEffect(() => {
       default: return '👨‍🌾 Farmer';
     }
   };
+  async function createNode(nodeName: string, cropType: string, _threshold: number) {
+    try {
+      const token = localStorage.getItem('token');
 
- async function createNode(nodeName: string, cropType: string, _threshold: number) {
-  try {
-    const token = localStorage.getItem('token');
+      // Get ALL existing nodes
+      const allNodesResponse = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/all', {
+        headers: { 'X-API-Key': 'PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g' }
+      });
+      const allNodes = await allNodesResponse.json();
 
-    // ✅ Step 1: Get ALL existing nodes (1-20)
-    const allNodesResponse = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/all', {
-      headers: { 'X-API-Key': 'PbCg3h3T0NzuNlg7Bq1YBurjIRwBFYS9908eTksmO7g' }
-    });
-    const allNodes = await allNodesResponse.json();
+      // Find the existing node with matching crop type
+      const existingNode = allNodes.find((n: { crop_type: string }) => n.crop_type === cropType);
 
-    // ✅ Step 2: Find the existing node with matching crop type
-    const existingNode = allNodes.find((n: { crop_type: string }) => n.crop_type === cropType);
+      if (!existingNode) {
+        toast.error(`No node found for crop: ${cropType}`);
+        return;
+      }
 
-    if (!existingNode) {
-      toast.error(`No node found for crop: ${cropType}`);
-      return;
+      // SELECT the existing node
+      const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/select', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          node_id: existingNode.id,
+          custom_name: nodeName,
+          location: 'Mbarara, Uganda'
+        })
+      });
+
+      if (response.ok) {
+        toast.success('✅ Garden selected successfully!');
+
+        // ✅ Close the form
+        setShowAddGardenForm(false);
+        setCropType('');
+        setNodeName('');
+
+        // ✅ Refresh the page to show the new garden
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to select garden');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error selecting garden');
     }
-
-    // ✅ Step 3: SELECT the existing node (NOT create new!)
-    const response = await fetch('https://smart-irrigation-and-plant-health.onrender.com/api/nodes/select', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        node_id: existingNode.id,
-        custom_name: nodeName,
-        location: 'Mbarara, Uganda'
-      })
-    });
-
-    if (response.ok) {
-      toast.success('Garden selected successfully!');
-      // ✅ Force a full page reload to the dashboard
-      window.location.href = '/';
-    } else {
-      const error = await response.json();
-      toast.error(error.error || 'Failed to select garden');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    toast.error('Error selecting garden');
   }
-}
   const fetchData = async (nodeId: number) => {
     try {
       const [dashboardRes, readingsRes, alertsRes, nodesRes] = await Promise.all([
@@ -212,24 +217,24 @@ useEffect(() => {
       setReadings(readingsRes.data);
       setAlerts(alertsRes.data);
       setAllNodes(nodesRes.data);
-      
+
       const newAlerts = alertsRes.data;
       const oldAlerts = previousAlertsRef.current;
-      
+
       if (newAlerts.length > 0 && oldAlerts.length > 0) {
         const addedAlerts = newAlerts.filter(
           alert => !oldAlerts.some(prev => prev.id === alert.id)
         );
-        
+
         addedAlerts.forEach((alert: Alert) => {
           const severityColors = {
             CRITICAL: 'bg-red-100 text-red-800 border-red-500',
             WARNING: 'bg-yellow-100 text-yellow-800 border-yellow-500',
             INFO: 'bg-blue-100 text-blue-800 border-blue-500',
           };
-          
+
           const colorClass = severityColors[alert.severity as keyof typeof severityColors] || 'bg-gray-100 border-gray-500';
-          
+
           toast.custom((t) => (
             <div
               className={`max-w-sm w-full shadow-lg rounded-lg border-l-4 ${colorClass} p-4`}
@@ -256,10 +261,10 @@ useEffect(() => {
           });
         });
       }
-      
+
       setAlerts(newAlerts);
       previousAlertsRef.current = newAlerts;
-      
+
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to fetch dashboard data');
@@ -310,7 +315,7 @@ useEffect(() => {
           message: recommendation.message
         })
       });
-      
+
       if (response.ok) {
         toast.success('Recommendation sent successfully!');
         setShowRecommendForm(false);
@@ -347,40 +352,40 @@ useEffect(() => {
 
   // Load initial node
   useEffect(() => {
- const loadInitialNode = async () => {
-  try {
-    const response = await nodeService.getAll();
-    const nodes = response.data;
-    setAllNodes(nodes);
-    
-    // Filter nodes that belong to the current user (for farmers)
-    let userNodes = nodes;
-    if (user?.role === 'farmer') {
-      userNodes = nodes.filter((n) => n.user_id === user.id);
-    }
-    
-    if (userNodes.length === 0) {
-      setLoading(false);
-      setSelectedNodeId(null);
-      return;
-    }
-    
-    const favoriteNode = userNodes.find((n) => favorites.includes(n.id));
-    const initialNode = favoriteNode || userNodes[0];
-    setSelectedNodeId(initialNode.id);
-    await fetchData(initialNode.id);
-    setLoading(false);
-  } catch (error) {
-    console.error('Error loading initial node:', error);
-    setLoading(false);
-  }
-};
+    const loadInitialNode = async () => {
+      try {
+        const response = await nodeService.getAll();
+        const nodes = response.data;
+        setAllNodes(nodes);
+
+        // Filter nodes that belong to the current user (for farmers)
+        let userNodes = nodes;
+        if (user?.role === 'farmer') {
+          userNodes = nodes.filter((n) => n.user_id === user.id);
+        }
+
+        if (userNodes.length === 0) {
+          setLoading(false);
+          setSelectedNodeId(null);
+          return;
+        }
+
+        const favoriteNode = userNodes.find((n) => favorites.includes(n.id));
+        const initialNode = favoriteNode || userNodes[0];
+        setSelectedNodeId(initialNode.id);
+        await fetchData(initialNode.id);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading initial node:', error);
+        setLoading(false);
+      }
+    };
     loadInitialNode();
-    
+
     if (isExtensionOfficer) {
       fetchFarmers();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRefresh = async () => {
@@ -415,7 +420,7 @@ useEffect(() => {
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <div className="text-base sm:text-xl text-gray-600">🌱 No gardens found</div>
         <p className="text-sm text-gray-400 mt-2">Create a new garden to get started</p>
-        
+
         <div className="mt-4 bg-white p-6 rounded-lg shadow-md w-full max-w-md">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">Add New Garden</h3>
           <form onSubmit={async (e) => {
@@ -438,7 +443,7 @@ useEffect(() => {
                 required
               />
             </div>
-            
+
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="crop-select">
                 Crop Type
@@ -458,7 +463,7 @@ useEffect(() => {
                 ))}
               </select>
             </div>
-            
+
             <button
               type="submit"
               className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
@@ -718,9 +723,8 @@ useEffect(() => {
                   <td className="py-2">{farmer.user.username}</td>
                   <td className="py-2">{farmer.node_count}</td>
                   <td className="py-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      farmer.node_count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
+                    <span className={`px-2 py-1 text-xs rounded-full ${farmer.node_count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
                       {farmer.node_count > 0 ? '✅ Active' : '❌ No gardens'}
                     </span>
                   </td>
@@ -757,20 +761,18 @@ useEffect(() => {
               <div
                 key={n.id}
                 onClick={() => handleNodeSelect(n.id)}
-                className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                  selectedNodeId === n.id
+                className={`cursor-pointer p-3 rounded-lg border-2 transition-all ${selectedNodeId === n.id
                     ? 'border-green-500 bg-green-50 shadow-md'
                     : 'border-gray-200 bg-white hover:border-green-300 hover:shadow'
-                }`}
+                  }`}
               >
                 <div className="text-2xl text-center">{getCropIcon(n.crop_type)}</div>
                 <div className="text-center mt-1">
                   <p className="text-sm font-medium text-gray-800 truncate">{n.node_name}</p>
                   <p className="text-xs text-gray-500">{n.crop_type || 'Unknown'}</p>
                   <p className="text-xs text-gray-400 mt-0.5">Threshold: {n.moisture_threshold}%</p>
-                  <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${
-                    n.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
+                  <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${n.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
                     {n.is_active ? '✅ Active' : '❌ Inactive'}
                   </span>
                   <div className="mt-1 text-yellow-500">★</div>
@@ -838,41 +840,41 @@ useEffect(() => {
       <div className="bg-white p-3 sm:p-4 rounded-lg shadow mb-4 sm:mb-6">
         <ChartComponent readings={readings} title="Sensor History" />
       </div>
-{/* Alerts and Pump Control - Responsive layout */}
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
-  <div className="lg:col-span-2">
-    <AlertsList alerts={alerts} onResolve={() => selectedNodeId && fetchData(selectedNodeId)} />
-  </div>
-  <div>
-    {user?.role === 'farmer' ? (
-      (() => {
-        // Calculate irrigation status
-        const threshold = node?.moisture_threshold || 35;
-        const currentMoisture = latest_reading?.soil_moisture || 0;
-        const irrigationNeeded = currentMoisture < threshold;
-        const canToggleOn = irrigationNeeded;
-        
-        return (
-          <PumpControl
-            status={pump_status}
-            onToggle={handleTogglePump}
-            irrigationNeeded={irrigationNeeded}
-            canToggleOn={canToggleOn}
-            soilMoisture={currentMoisture}
-            threshold={threshold}
-            message={irrigationNeeded 
-              ? "Soil is dry. Turn pump ON if needed." 
-              : `Soil moisture (${currentMoisture}%) is above threshold (${threshold}%). Pump locked OFF.`}
-          />
-        );
-      })()
-    ) : (
-      <div className="bg-gray-100 rounded-lg shadow p-4 text-center text-gray-500">
-        <p className="text-sm">🔒 Pump control is only available for farmers</p>
+      {/* Alerts and Pump Control - Responsive layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6" id="alerts-section">
+        <div className="lg:col-span-2">
+          <AlertsList alerts={alerts} onResolve={() => selectedNodeId && fetchData(selectedNodeId)} />
+        </div>
+        <div>
+          {user?.role === 'farmer' ? (
+            (() => {
+              // Calculate irrigation status
+              const threshold = node?.moisture_threshold || 35;
+              const currentMoisture = latest_reading?.soil_moisture || 0;
+              const irrigationNeeded = currentMoisture < threshold;
+              const canToggleOn = irrigationNeeded;
+
+              return (
+                <PumpControl
+                  status={pump_status}
+                  onToggle={handleTogglePump}
+                  irrigationNeeded={irrigationNeeded}
+                  canToggleOn={canToggleOn}
+                  soilMoisture={currentMoisture}
+                  threshold={threshold}
+                  message={irrigationNeeded
+                    ? "Soil is dry. Turn pump ON if needed."
+                    : `Soil moisture (${currentMoisture}%) is above threshold (${threshold}%). Pump locked OFF.`}
+                />
+              );
+            })()
+          ) : (
+            <div className="bg-gray-100 rounded-lg shadow p-4 text-center text-gray-500">
+              <p className="text-sm">🔒 Pump control is only available for farmers</p>
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-</div>
     </div>
   );
 };
