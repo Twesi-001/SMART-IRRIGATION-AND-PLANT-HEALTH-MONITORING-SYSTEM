@@ -47,9 +47,22 @@ def create_alert():
 @alerts_bp.route("/<int:alert_id>/resolve", methods=["POST"])
 @jwt_required()
 def resolve_alert(alert_id):
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    
     alert = Alert.query.get(alert_id)
     if not alert:
         return jsonify({"error": "alert not found"}), 404
+    
+    # ✅ Check permission for farmers
+    if user.role == 'farmer':
+        farmer_node = FarmerNode.query.filter_by(
+            farmer_id=current_user_id,
+            node_id=alert.node_id
+        ).first()
+        node = SensorNode.query.get(alert.node_id)
+        if not farmer_node and (not node or node.user_id != current_user_id):
+            return jsonify({"error": "You don't have permission to resolve this alert"}), 403
 
     alert.resolved = True
     alert.resolved_at = datetime.utcnow()
@@ -71,7 +84,6 @@ def get_alert(alert_id):
     
     # ✅ Check permission for farmers
     if user.role == 'farmer':
-        # Check if farmer owns the node
         farmer_node = FarmerNode.query.filter_by(
             farmer_id=current_user_id,
             node_id=alert.node_id
@@ -160,11 +172,9 @@ def get_unresolved_alerts():
     
     # ✅ For farmers, only show alerts for their nodes
     if user.role == 'farmer':
-        # Get all nodes this farmer has access to
         farmer_nodes = FarmerNode.query.filter_by(farmer_id=current_user_id).all()
         farmer_node_ids = [fn.node_id for fn in farmer_nodes]
         
-        # Also check direct ownership
         direct_nodes = SensorNode.query.filter_by(user_id=current_user_id).all()
         direct_node_ids = [n.id for n in direct_nodes]
         
@@ -205,7 +215,6 @@ def get_alerts_summary():
     
     from sqlalchemy import func # type: ignore
     
-    # ✅ For farmers, only count alerts for their nodes
     if user.role == 'farmer':
         farmer_nodes = FarmerNode.query.filter_by(farmer_id=current_user_id).all()
         farmer_node_ids = [fn.node_id for fn in farmer_nodes]
@@ -232,7 +241,6 @@ def get_alerts_summary():
         ).count()
         
     else:
-        # Admins and extension officers see all alerts
         summary = db.session.query(
             Alert.node_id,
             func.count(Alert.id).label('unresolved_count')
@@ -270,9 +278,18 @@ def send_recommendation_to_farmer():
     if not farmer or farmer.role != 'farmer':
         return jsonify({"error": "Farmer not found"}), 404
     
-    # Check if node exists and belongs to farmer
+    # ✅ Check if node exists
     node = SensorNode.query.get(node_id)
-    if not node or node.user_id != farmer_id:
+    if not node:
+        return jsonify({"error": "Node not found"}), 404
+    
+    # ✅ Check if farmer has selected this node (via FarmerNode OR direct ownership)
+    farmer_node = FarmerNode.query.filter_by(
+        farmer_id=farmer_id,
+        node_id=node_id
+    ).first()
+    
+    if not farmer_node and node.user_id != farmer_id:
         return jsonify({"error": "Node not found or does not belong to farmer"}), 404
     
     # Create alert for the farmer
