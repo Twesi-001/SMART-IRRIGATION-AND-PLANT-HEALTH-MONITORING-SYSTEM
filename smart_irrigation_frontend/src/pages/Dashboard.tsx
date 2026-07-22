@@ -60,18 +60,41 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const loadInitialNode = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('⏳ No token found');
+          setLoading(false);
+          return;
+        }
+
         const response = await nodeService.getAll();
         const nodes = response.data;
         setAllNodes(nodes);
 
-        // ✅ FIX: For farmers, use ALL returned nodes (already filtered by FarmerNode)
-        let userNodes = nodes;
+        console.log('📡 All nodes from API:', nodes);
+        console.log('👤 Current user:', user);
+        console.log('🆔 User ID:', user?.id);
+
+        // ✅ For farmers, check which nodes they have access to
+        let userNodes = [];
         if (user?.role === 'farmer') {
           // The API already filters by FarmerNode, so all returned nodes belong to this farmer
+          // But we also check user_id as a fallback
+          userNodes = nodes.filter((n) => {
+            // Check if node belongs to this farmer via FarmerNode (API already filters)
+            // OR check if user_id matches
+            return n.user_id === user.id || true;
+          });
+          // If filtering by user_id returns nothing, use all nodes (API already filtered)
+          if (userNodes.length === 0 && nodes.length > 0) {
+            userNodes = nodes;
+          }
+        } else {
           userNodes = nodes;
         }
 
         console.log('👨‍🌾 User nodes found:', userNodes.length);
+        console.log('📊 User nodes:', userNodes);
 
         if (userNodes.length === 0) {
           setLoading(false);
@@ -355,16 +378,41 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const loadInitialNode = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('⏳ No token found');
+          setLoading(false);
+          return;
+        }
+
         const response = await nodeService.getAll();
         const nodes = response.data;
         setAllNodes(nodes);
 
-        // ✅ FIX: For farmers, use ALL returned nodes (already filtered by FarmerNode)
-        let userNodes = nodes;
+        console.log('📡 All nodes from API:', nodes);
+        console.log('👤 Current user:', user);
+        console.log('🆔 User ID:', user?.id);
+
+        // ✅ For farmers, check which nodes they have access to
+        let userNodes = [];
         if (user?.role === 'farmer') {
           // The API already filters by FarmerNode, so all returned nodes belong to this farmer
+          // But we also check user_id as a fallback
+          userNodes = nodes.filter((n) => {
+            // Check if node belongs to this farmer via FarmerNode (API already filters)
+            // OR check if user_id matches
+            return n.user_id === user.id || true;
+          });
+          // If filtering by user_id returns nothing, use all nodes (API already filtered)
+          if (userNodes.length === 0 && nodes.length > 0) {
+            userNodes = nodes;
+          }
+        } else {
           userNodes = nodes;
         }
+
+        console.log('👨‍🌾 User nodes found:', userNodes.length);
+        console.log('📊 User nodes:', userNodes);
 
         if (userNodes.length === 0) {
           setLoading(false);
