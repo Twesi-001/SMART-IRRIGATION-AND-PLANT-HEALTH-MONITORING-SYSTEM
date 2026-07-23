@@ -68,38 +68,24 @@ def create_node():
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         
-        # Only farmers and admins can create nodes
-        if user.role not in ['farmer', 'admin']:
-            return jsonify({"error": "Only farmers and admins can create nodes"}), 403
+        # ✅ RESTRICT: Only admins can create NEW nodes
+        if user.role != 'admin':
+            return jsonify({
+                "error": "Only admins can create new nodes. Farmers should use the 'Add Garden' form to select existing crops."
+            }), 403
 
         node = SensorNode(
             node_name=node_name,
             location=data.get("location", "Unknown"),
             crop_type=data.get("crop_type"),
             moisture_threshold=data.get("moisture_threshold", 30.00),
-            user_id=current_user_id if user.role == 'farmer' else data.get("user_id", current_user_id),
+            user_id=current_user_id,
             is_active=True
         )
         db.session.add(node)
         db.session.commit()
         
-        # ✅ Also create FarmerNode association for new farmers
-        if user.role == 'farmer':
-            try:
-                farmer_node = FarmerNode(
-                    farmer_id=current_user_id,
-                    node_id=node.id,
-                    custom_name=node_name,
-                    location=data.get("location", "Unknown")
-                )
-                db.session.add(farmer_node)
-                db.session.commit()
-                print(f"✅ Created FarmerNode association: farmer {current_user_id} → node {node.id}")
-            except Exception as e:
-                print(f"⚠️ Could not create FarmerNode: {e}")
-                # Don't fail the request
-        
-        print(f"✅ Created node {node.id} for user {current_user_id}")
+        print(f"✅ Admin created node {node.id} for user {current_user_id}")
         return jsonify(node.to_dict()), 201
         
     except Exception as e:
