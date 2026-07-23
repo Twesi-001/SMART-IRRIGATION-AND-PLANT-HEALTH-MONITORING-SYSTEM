@@ -64,7 +64,8 @@ def get_all_node_ids_with_token():
         )
         if response.status_code == 200:
             nodes = response.json()
-            return [node['id'] for node in nodes]
+            # ✅ Only use nodes 1-20
+            return [node['id'] for node in nodes if 1 <= node['id'] <= 20]
     except:
         pass
     return list(range(1, 21))
@@ -81,17 +82,26 @@ def fetch_all_nodes():
         )
         if response.status_code == 200:
             nodes = response.json()
-            NODE_IDS = [node['id'] for node in nodes]
+            # ✅ ONLY use nodes 1-20 (fixed nodes)
+            NODE_IDS = [node['id'] for node in nodes if 1 <= node['id'] <= 20]
             LAST_FETCH_TIME = time.time()
-            print(f"📡 Found {len(NODE_IDS)} nodes in database")
+            print(f"📡 Found {len(NODE_IDS)} nodes in database (1-20 only)")
             print(f"📡 Node IDs: {NODE_IDS}")
             return NODE_IDS
         else:
             print(f"⚠️ Could not fetch nodes with API key: {response.status_code}")
-            return get_all_node_ids_with_token()
+            # ✅ Fallback: Use hardcoded nodes 1-20
+            NODE_IDS = list(range(1, 21))
+            LAST_FETCH_TIME = time.time()
+            print(f"📡 Using fallback: nodes 1-20")
+            return NODE_IDS
     except Exception as e:
         print(f"⚠️ Error fetching nodes: {e}")
-        return get_all_node_ids_with_token()
+        # ✅ Fallback: Use hardcoded nodes 1-20
+        NODE_IDS = list(range(1, 21))
+        LAST_FETCH_TIME = time.time()
+        print(f"📡 Using fallback: nodes 1-20")
+        return NODE_IDS
 
 def get_all_node_ids():
     """Get all node IDs, refreshing cache if needed"""
